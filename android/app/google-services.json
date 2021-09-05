@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "61702134116",
+    "project_id": "dinnerpeople-d43d2",
+    "storage_bucket": "dinnerpeople-d43d2.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61702134116:android:8b0083ac99fdfcc1b38271",
+        "android_client_info": {
+          "package_name": "dinnerpeople.Chat.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "61702134116-hklvnr4tt9qpvrdhl1t7qeusfpuqejkq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnh6yPM5Cc79pSnOZhljeH5_KYwNrwlhg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "61702134116-hklvnr4tt9qpvrdhl1t7qeusfpuqejkq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
