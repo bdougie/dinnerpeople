@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import type { User } from '../types';
+import { useEffect } from 'react';
 
 interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
+  initializeAuth: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -17,6 +19,31 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: true,
   error: null,
+  
+  initializeAuth: async () => {
+    try {
+      set({ loading: true });
+      
+      // Get session from Supabase (automatically checks cookies/localStorage)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        set({ 
+          user: { 
+            id: session.user.id, 
+            email: session.user.email! 
+          },
+          loading: false
+        });
+      } else {
+        set({ user: null, loading: false });
+      }
+    } catch (error) {
+      console.error('Error initializing auth:', error);
+      set({ user: null, loading: false });
+    }
+  },
+  
   signIn: async (email, password) => {
     try {
       set({ loading: true, error: null });
@@ -122,3 +149,33 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   clearError: () => set({ error: null })
 }));
+
+// Set up auth state listener
+export const initializeAuthListener = () => {
+  const { initializeAuth } = useAuthStore.getState();
+  
+  // Initialize auth state on first load
+  initializeAuth();
+  
+  // Set up a listener for auth state changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_event, session) => {
+      if (session?.user) {
+        useAuthStore.setState({ 
+          user: { 
+            id: session.user.id, 
+            email: session.user.email! 
+          },
+          loading: false
+        });
+      } else {
+        useAuthStore.setState({ user: null, loading: false });
+      }
+    }
+  );
+  
+  // Return the unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
+};
