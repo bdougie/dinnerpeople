@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import MDEditor from "@uiw/react-md-editor";
+import { useFoodQuote } from "../hooks/useFoodQuote";
 
 // Mock data for demonstration
 const mockRecipes = [
@@ -91,6 +92,9 @@ export default function Home() {
   const [interactions, setInteractions] = useState<
     Record<string, { liked: boolean; saved: boolean }>
   >({});
+
+  // Get a random food quote using our custom hook
+  const randomQuote = useFoodQuote();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -413,11 +417,10 @@ export default function Home() {
                   </div>
                   <div className="relative z-10">
                     <p className="text-2xl md:text-3xl font-light leading-relaxed tracking-wide text-black dark:text-white">
-                      Dinner is not just about feeding the body; it's about
-                      nourishing the soul.
+                      {randomQuote.text}
                     </p>
                     <p className="mt-6 text-lg tracking-wider text-gray-500 dark:text-gray-400">
-                      ~ Alice Waters
+                      ~ {randomQuote.author}
                     </p>
                   </div>
                   <div className="absolute -bottom-8 -right-8 text-8xl text-black/5 dark:text-white/5 transform rotate-180">
