@@ -17,14 +17,18 @@ export const PROMPTS = {
     "Describe this cooking step in detail, focusing on the ingredients, techniques, and any important details visible in the frame. Keep it concise but informative.",
   
   RECIPE_SUMMARY: 
-    `Based on the following chronological cooking steps, create a concise recipe title and detailed description. 
-    The title should be appealing, descriptive, and under 60 characters. 
+    `Based ONLY on the following chronological cooking steps, create a concise recipe title and detailed description.
+    The title should be appealing, descriptive, and under 60 characters.
     The description should be 2-3 sentences summarizing the dish, key ingredients, and cooking methods.
+    
+    DO NOT invent or add any ingredients or steps that are not mentioned in the provided cooking steps.
+    ONLY use information that appears in the provided steps.
     
     Cooking steps:
     {steps}
     
-    Format your response as JSON with 'title' and 'description' fields.`
+    Format your response as valid JSON with 'title' and 'description' fields only.
+    Example: {"title": "Recipe Title", "description": "Recipe description text"}`
 }
 
 /**
