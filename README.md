@@ -288,3 +288,66 @@ See the migration files in `/supabase/migrations` for the complete database sche
 - Processing queue
 - Recipe interactions
 
+## Supabase Migrations
+
+### Prerequisites
+- Supabase CLI
+  ```bash
+  brew install supabase/tap/supabase
+  ```
+- Docker Desktop
+  ```bash
+  brew install --cask docker
+  ```
+  
+### Running Supabase Locally
+1. Start the local Supabase instance
+   ```bash
+   supabase start
+   ```
+   This will launch all required services (PostgreSQL, API, Auth, etc.)
+
+2. View local Supabase Studio
+   After starting, the CLI will output a Studio URL (typically http://localhost:54323)
+
+### Managing Migrations
+
+#### Creating a New Migration
+1. Generate a timestamped migration file
+   ```bash
+   supabase migration new your_migration_name
+   ```
+
+2. Edit the generated SQL file in `supabase/migrations/[timestamp]_your_migration_name.sql`
+
+#### Applying Migrations
+1. Apply all pending migrations
+   ```bash
+   supabase migration up
+   ```
+
+2. Verify migration was applied
+   ```bash
+   supabase db execute "SELECT * FROM supabase_migrations.schema_migrations ORDER BY version DESC LIMIT 5;"
+   ```
+
+#### Resetting Database (Development Only)
+If you need to reset your local database:
+```bash
+supabase db reset
+```
+This will drop all data and reapply migrations from scratch.
+
+### Pushing Schema Changes to Production
+To apply migrations to your production Supabase instance:
+
+1. Link your local project to your Supabase project (first time only)
+   ```bash
+   supabase link --project-ref your-project-ref
+   ```
+
+2. Push migrations to production (use with caution!)
+   ```bash
+   supabase db push
+   ```
+
