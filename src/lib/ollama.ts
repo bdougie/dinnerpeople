@@ -216,30 +216,50 @@ class OllamaAPI {
       console.log(`[DEBUG] Generating embedding for frame at ${timestamp}s`);
       const embedding = await this.generateEmbedding(description);
       
-      // Check embedding dimensions
+      // Check embedding dimensions and pad if necessary
+      let paddedEmbedding = embedding;
       if (embedding.length !== 1536) {
-        console.warn(`[DEBUG] Warning: Embedding dimension (${embedding.length}) doesn't match expected 1536 dimensions`);
-        // You may need to pad or truncate the embedding if dimensions don't match
+        console.log(`[DEBUG] Embedding has ${embedding.length} dimensions, padding to 1536`);
+        paddedEmbedding = this.padEmbedding(embedding, 1536);
       }
       
-      // Store frame with embedding in Supabase
-      const { error } = await supabase
-        .from('video_frames')
-        .insert({
-          recipe_id: recipeId,
-          timestamp: timestamp,
-          description: description,
-          image_url: imageUrl,
-          embedding: embedding
-        });
-        
-      if (error) throw error;
+      // Store the frame with the padded embedding
+      const { error } = await supabase.from('video_frames').insert({
+        recipe_id: recipeId,
+        timestamp,
+        description,
+        image_url: imageUrl,
+        embedding: paddedEmbedding
+      });
       
+      if (error) throw error;
       console.log(`[DEBUG] Successfully stored frame with embedding at ${timestamp}s`);
     } catch (error) {
       console.error('[DEBUG] Error storing frame with embedding:', error);
       throw error;
     }
+  }
+
+  /**
+   * Pad or truncate an embedding to the desired length
+   */
+  private padEmbedding(embedding: number[], targetLength: number): number[] {
+    if (embedding.length === targetLength) {
+      return embedding;
+    }
+    
+    if (embedding.length > targetLength) {
+      // Truncate if longer
+      return embedding.slice(0, targetLength);
+    }
+    
+    // Pad with zeros if shorter
+    const result = [...embedding];
+    while (result.length < targetLength) {
+      result.push(0);
+    }
+    
+    return result;
   }
 
   /**
