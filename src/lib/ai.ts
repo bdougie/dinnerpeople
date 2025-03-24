@@ -9,11 +9,11 @@ import type { RecipeSummary } from './prompt-utils';
 class AIService {
   private isLocalEnvironment(): boolean {
     // Temporarily return false to force using OpenAI instead of Ollama
-    return false;
+    return true;
     
     // Original implementation (comment out while testing)
-    // return window.location.hostname === 'localhost' || 
-    //       window.location.hostname === '127.0.0.1';
+    return window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1';
   }
 
   async analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
