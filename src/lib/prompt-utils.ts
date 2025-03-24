@@ -14,9 +14,10 @@ export interface RecipeSummary {
  */
 export const PROMPTS = {
   FRAME_ANALYSIS: 
-    `Describe this cooking step in detail, focusing on the ingredients,
-    techniques, and any important details visible in the frame. Keep it concise
-    but informative.`,
+    `Analyze this image and identify the food shown. 
+    If you are uncertain, DO NOT GUESS specific dishes.
+    Instead, describe what you can see with certainty (colors, textures, etc).
+    Is this: 1) A dessert, 2) A main dish, 3) A side dish, 4) Something else?`,
   
   SOCIAL_MEDIA_DETECTION:
     `Analyze the provided image carefully and locate any visible social media
