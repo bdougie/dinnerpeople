@@ -248,4 +248,4 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
 
 // Create and export a singleton instance
 // Use regular llama3 model which is more widely available
-export const ollama = new OllamaAPI('http://localhost:11434', 'llama3');
+export const ollama = new OllamaAPI('http://localhost:11434', 'llama3.2-vision:11b');
