@@ -13,6 +13,7 @@ import { supabase } from "../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import toast, { Toaster } from "react-hot-toast";
 import { extractFrames, uploadFrames } from "../lib/video";
+import { storeFrameWithEmbedding } from "../lib/openai";
 
 interface UploadPreview {
   file: File;
@@ -384,27 +385,27 @@ export default function Upload() {
         `[DEBUG] Successfully uploaded ${uploadedFrames.length} frames`
       );
 
-      // Store frame data in Supabase
-      console.log("[DEBUG] Saving frame data to database");
+      // Process and store frames with embeddings
+      console.log("[DEBUG] Processing frames and generating embeddings");
       for (const frame of uploadedFrames) {
         try {
-          const { error: insertError } = await supabase
-            .from("video_frames")
-            .insert({
-              recipe_id: recipeId,
-              timestamp: frame.timestamp,
-              image_url: frame.imageUrl,
-              // Make sure to include the correct user_id if your schema needs it
-              // user_id: userData.user.id
-            });
+          // Generate a description for the frame
+          // This would typically use image analysis API like OpenAI Vision
+          // For now we'll use a placeholder description based on timestamp
+          const description = `Frame at ${frame.timestamp} seconds showing cooking progress.`;
 
-          if (insertError) {
-            console.error("[DEBUG] Error inserting frame:", insertError);
-            // Continue with other frames even if one fails
-          }
+          // Store frame with embedding
+          await storeFrameWithEmbedding(
+            recipeId,
+            frame.timestamp,
+            description,
+            frame.imageUrl
+          );
+
+          console.log(`[DEBUG] Processed frame at ${frame.timestamp}s`);
         } catch (frameError) {
-          console.error("[DEBUG] Exception inserting frame:", frameError);
-          // Continue with other frames
+          console.error(`[DEBUG] Error processing frame: ${frameError}`);
+          // Continue with other frames even if one fails
         }
       }
 

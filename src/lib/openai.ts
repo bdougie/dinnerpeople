@@ -35,6 +35,51 @@ export async function analyzeFrame(imageUrl: string): Promise<string> {
   }
 }
 
+export async function generateEmbedding(text: string): Promise<number[]> {
+  try {
+    const response = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text,
+      encoding_format: "float"
+    });
+    
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    throw error;
+  }
+}
+
+export async function storeFrameWithEmbedding(
+  recipeId: string, 
+  timestamp: number,
+  description: string,
+  imageUrl: string
+): Promise<void> {
+  try {
+    // Generate embedding for the description
+    const embedding = await generateEmbedding(description);
+    
+    // Store in database with embedding
+    const { error } = await supabase
+      .from('video_frames')
+      .insert({
+        recipe_id: recipeId,
+        timestamp,
+        description,
+        image_url: imageUrl,
+        embedding
+      });
+      
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error storing frame with embedding:', error);
+    throw error;
+  }
+}
+
 export async function processVideoFrames(videoId: string, frames: { timestamp: number, imageUrl: string }[]) {
   const descriptions: { timestamp: number, description: string }[] = [];
 
@@ -48,14 +93,7 @@ export async function processVideoFrames(videoId: string, frames: { timestamp: n
       });
 
       // Store each frame description as we get it
-      await supabase
-        .from('video_frames')
-        .insert({
-          recipe_id: videoId,
-          timestamp: frame.timestamp,
-          description,
-          image_url: frame.imageUrl
-        });
+      await storeFrameWithEmbedding(videoId, frame.timestamp, description, frame.imageUrl);
 
     } catch (error) {
       console.error(`Error processing frame at ${frame.timestamp}:`, error);
