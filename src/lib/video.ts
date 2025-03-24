@@ -55,9 +55,27 @@ export async function extractFrames(videoFile: File, interval: number = 5): Prom
 
 export async function uploadFrames(frames: { timestamp: number, blob: Blob }[], recipeId: string) {
   const uploadedFrames: { timestamp: number, imageUrl: string }[] = [];
+  
+  // Get current user to ensure proper permissions
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) {
+    throw new Error('User not authenticated');
+  }
+  
+  // Check recipe ownership
+  const { data: recipeData, error: recipeError } = await supabase
+    .from('recipes')
+    .select('user_id')
+    .eq('id', recipeId)
+    .single();
+    
+  if (recipeError || recipeData.user_id !== userData.user.id) {
+    throw new Error('Not authorized to upload frames for this recipe');
+  }
 
   for (const frame of frames) {
-    const path = `${recipeId}/${frame.timestamp}.jpg`;
+    // Include user_id in the path to avoid permission issues
+    const path = `${userData.user.id}/${recipeId}/${frame.timestamp}.jpg`;
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('frames')

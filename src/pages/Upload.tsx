@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import toast, { Toaster } from "react-hot-toast";
+import { extractFrames, uploadFrames } from "../lib/video";
 
 interface UploadPreview {
   file: File;
@@ -50,6 +51,9 @@ export default function Upload() {
     { id: "frames", label: "Processing frames", status: "waiting" },
     { id: "analysis", label: "Analyzing content", status: "waiting" },
   ]);
+
+  const [processingFrames, setProcessingFrames] = useState(false);
+  const [frameProgress, setFrameProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     if (isUploading) {
@@ -169,6 +173,20 @@ export default function Upload() {
       }
     };
   }, [recipeId]);
+
+  useEffect(() => {
+    if (
+      processingStatus?.status === "processing" &&
+      preview?.file &&
+      recipeId &&
+      !processingFrames
+    ) {
+      console.log(
+        "[DEBUG] Processing status changed to processing, starting frame extraction"
+      );
+      processVideoFrames(preview.file, recipeId);
+    }
+  }, [processingStatus, preview, recipeId, processingFrames]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -295,6 +313,150 @@ export default function Upload() {
     }
   };
 
+  const processVideoFrames = async (videoFile: File, recipeId: string) => {
+    try {
+      setProcessingFrames(true);
+      console.log("[DEBUG] Starting frame extraction");
+
+      // Get current user to verify permissions
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Verify the recipe belongs to the current user
+      const { data: recipeData, error: recipeError } = await supabase
+        .from("recipes")
+        .select("user_id")
+        .eq("id", recipeId)
+        .single();
+
+      if (recipeError) {
+        console.error("[DEBUG] Error verifying recipe ownership:", recipeError);
+        throw new Error("Could not verify recipe ownership");
+      }
+
+      if (recipeData.user_id !== userData.user.id) {
+        throw new Error("Not authorized to process this recipe");
+      }
+
+      // Extract frames from the video
+      const frames = await extractFrames(videoFile);
+      console.log(`[DEBUG] Extracted ${frames.length} frames from video`);
+      setFrameProgress({ current: 0, total: frames.length });
+
+      // Upload frames to Supabase
+      console.log("[DEBUG] Starting frame uploads");
+      const uploadedFrames = [];
+
+      for (let i = 0; i < frames.length; i++) {
+        const frame = frames[i];
+
+        // Upload individual frame
+        const path = `${userData.user.id}/${recipeId}/${frame.timestamp}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from("frames")
+          .upload(path, frame.blob);
+
+        if (uploadError) {
+          console.error(`[DEBUG] Error uploading frame ${i}:`, uploadError);
+          continue;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("frames")
+          .getPublicUrl(path);
+
+        uploadedFrames.push({
+          timestamp: frame.timestamp,
+          imageUrl: urlData.publicUrl,
+        });
+
+        // Update progress
+        setFrameProgress((prev) => ({
+          ...prev,
+          current: i + 1,
+        }));
+      }
+
+      console.log(
+        `[DEBUG] Successfully uploaded ${uploadedFrames.length} frames`
+      );
+
+      // Store frame data in Supabase
+      console.log("[DEBUG] Saving frame data to database");
+      for (const frame of uploadedFrames) {
+        try {
+          const { error: insertError } = await supabase
+            .from("video_frames")
+            .insert({
+              recipe_id: recipeId,
+              timestamp: frame.timestamp,
+              image_url: frame.imageUrl,
+              // Make sure to include the correct user_id if your schema needs it
+              // user_id: userData.user.id
+            });
+
+          if (insertError) {
+            console.error("[DEBUG] Error inserting frame:", insertError);
+            // Continue with other frames even if one fails
+          }
+        } catch (frameError) {
+          console.error("[DEBUG] Exception inserting frame:", frameError);
+          // Continue with other frames
+        }
+      }
+
+      console.log("[DEBUG] Frame processing complete, updating status");
+
+      // Update processing status to completed
+      const { error: updateError } = await supabase
+        .from("processing_queue")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("recipe_id", recipeId);
+
+      if (updateError) {
+        console.error("[DEBUG] Error updating processing status:", updateError);
+        throw updateError;
+      }
+
+      // Update the processing status in the UI
+      setProcessingStatus({
+        status: "completed",
+      });
+
+      toast.success("Video processing completed successfully!");
+    } catch (err: any) {
+      console.error("[DEBUG] Error processing frames:", err);
+      toast.error(`Error processing video frames: ${err.message}`);
+
+      // Update processing status to failed
+      try {
+        await supabase
+          .from("processing_queue")
+          .update({
+            status: "failed",
+            error: `Frame processing failed: ${err.message}`,
+          })
+          .eq("recipe_id", recipeId);
+
+        // Update UI status
+        setProcessingStatus({
+          status: "failed",
+          error: `Frame processing failed: ${err.message}`,
+        });
+      } catch (updateErr) {
+        console.error("[DEBUG] Error updating failure status:", updateErr);
+      }
+    } finally {
+      setProcessingFrames(false);
+    }
+  };
+
   // Add a useEffect that will check processing status periodically if realtime updates fail
   useEffect(() => {
     let interval: number | undefined;
@@ -415,7 +577,32 @@ export default function Upload() {
                       <div className="flex-grow">
                         <p className="text-lg font-medium text-white">
                           {step.label}
+                          {step.id === "frames" &&
+                            processingFrames &&
+                            frameProgress.total > 0 && (
+                              <span className="ml-2 text-sm font-normal">
+                                ({frameProgress.current}/{frameProgress.total})
+                              </span>
+                            )}
                         </p>
+
+                        {/* Add progress bar for frames step */}
+                        {step.id === "frames" &&
+                          step.status === "current" &&
+                          frameProgress.total > 0 && (
+                            <div className="mt-1 w-full bg-white/10 rounded-full h-1.5">
+                              <div
+                                className="bg-orange-500 h-1.5 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${
+                                    (frameProgress.current /
+                                      frameProgress.total) *
+                                    100
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                          )}
                       </div>
                     </div>
                     {index < processingSteps.length - 1 && (
