@@ -166,11 +166,38 @@ class OllamaAPI {
     }
 
     try {
-      const prompt = PromptUtils.PROMPTS.RECIPE_SUMMARY.replace('{steps}', cookingSteps);
+      // Modify prompt to be more explicit about JSON format requirement
+      const prompt = `${PromptUtils.PROMPTS.RECIPE_SUMMARY.replace('{steps}', cookingSteps)}
+      
+IMPORTANT: Your response MUST be in valid JSON format with only 'title' and 'description' fields.
+Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       
       // Standard text completion for recipe summary
       const response = await this.generateCompletion(prompt);
-      return PromptUtils.parseRecipeSummaryResponse(response);
+      
+      try {
+        // Try to parse response as JSON
+        return PromptUtils.parseRecipeSummaryResponse(response);
+      } catch (parseError) {
+        console.error('[DEBUG] Failed to parse Ollama response as JSON:', parseError);
+        console.log('[DEBUG] Raw response:', response);
+        
+        // Fallback: Extract a title from the response if possible
+        let title = 'Untitled Recipe';
+        if (response.includes('title') || response.includes('Title')) {
+          const titleMatch = response.match(/(?:title|Title)[:\s]+["']?([^"'\n]+)["']?/i);
+          if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].trim();
+          }
+        }
+        
+        // Create fallback summary object
+        return {
+          title: title,
+          description: 'A delicious recipe created from cooking video. ' + 
+                      response.substring(0, 100).replace(/["{}\[\]]/g, '') + '...'
+        };
+      }
     } catch (error) {
       console.error('[DEBUG] Error generating recipe summary with Ollama:', error);
       return {
@@ -184,7 +211,39 @@ class OllamaAPI {
    * Complete recipe summarization with Ollama
    */
   async updateRecipeWithSummary(recipeId: string): Promise<void> {
-    return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
+    try {
+      // Get existing recipe data to ensure we're not losing information
+      const { data: existingRecipe, error: fetchError } = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', recipeId)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Generate the recipe summary
+      const summary = await this.generateRecipeSummary(
+        existingRecipe.cooking_steps || ''
+      );
+      
+      // Update only fields we know exist in the schema
+      const { error: updateError } = await supabase
+        .from('recipes')
+        .update({
+          title: summary.title,
+          description: summary.description,
+          // Remove reference to ai_generated column
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', recipeId);
+        
+      if (updateError) throw updateError;
+      
+      console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
+    } catch (error) {
+      console.error('[DEBUG] Error updating recipe with summary:', error);
+      throw error;
+    }
   }
 }
 
