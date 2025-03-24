@@ -251,6 +251,22 @@ export default function Upload() {
       console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
+
+      // Set initial processing status from upload result to avoid waiting for realtime updates
+      if (result.processingStatus) {
+        console.log(
+          "[DEBUG] Setting initial processing status from upload result:",
+          result.processingStatus
+        );
+        setProcessingStatus({
+          status: result.processingStatus as
+            | "pending"
+            | "processing"
+            | "completed"
+            | "failed",
+        });
+      }
+
       setIsUploading(false);
       console.log("[DEBUG] Upload state set to false");
     } catch (err: any) {
@@ -278,6 +294,56 @@ export default function Upload() {
       setIsUploading(false);
     }
   };
+
+  // Add a useEffect that will check processing status periodically if realtime updates fail
+  useEffect(() => {
+    let interval: number | undefined;
+
+    // If we have a recipeId but no processing status or still in pending state,
+    // set up a polling mechanism as a fallback
+    if (
+      recipeId &&
+      (!processingStatus || processingStatus.status === "pending")
+    ) {
+      console.log("[DEBUG] Setting up fallback polling for processing status");
+
+      interval = window.setInterval(() => {
+        console.log("[DEBUG] Polling for processing status");
+        supabase
+          .from("processing_queue")
+          .select("status, error")
+          .eq("recipe_id", recipeId)
+          .single()
+          .then(({ data, error }) => {
+            if (!error && data && data.status !== processingStatus?.status) {
+              console.log("[DEBUG] Polling found updated status:", data.status);
+              setProcessingStatus({
+                status: data.status,
+                error: data.error,
+              });
+
+              // If we got a completed or failed status, we can stop polling
+              if (data.status === "completed" || data.status === "failed") {
+                if (interval) {
+                  clearInterval(interval);
+                }
+              }
+            }
+          });
+      }, 3000); // Check every 3 seconds
+    }
+
+    // If we have processingStatus and it's not pending, we can stop polling
+    if (processingStatus && processingStatus.status !== "pending" && interval) {
+      clearInterval(interval);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [recipeId, processingStatus]);
 
   const handleSave = async () => {
     if (!recipeId) return;

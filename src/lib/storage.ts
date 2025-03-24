@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface UploadResult {
   recipeId: string;
+  processingStatus: string;
 }
 
 export async function uploadVideo(file: File): Promise<UploadResult> {
@@ -102,6 +103,27 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
         throw storageError;
       }
     }
+
+    // Upload successful - update processing_queue status to "processing"
+    console.log('[DEBUG] Updating processing queue status to "processing"');
+    const { error: updateError } = await supabase
+      .from('processing_queue')
+      .update({ 
+        status: 'processing',
+        started_at: new Date().toISOString()
+      })
+      .eq('recipe_id', recipeId);
+    
+    if (updateError) {
+      console.error('[DEBUG] Error updating processing status:', updateError);
+    } else {
+      console.log('[DEBUG] Processing status updated to "processing"');
+    }
+
+    return { 
+      recipeId,
+      processingStatus: 'processing' 
+    };
   } catch (error: any) {
     // Catch and rethrow errors, including network issues that might occur during large uploads
     console.error('[DEBUG] Upload exception:', error);
@@ -129,5 +151,5 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
   }
 
   console.log('[DEBUG] Video upload completed successfully');
-  return { recipeId };
+  return { recipeId, processingStatus: 'processing' };
 }

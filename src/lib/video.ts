@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 export async function extractFrames(videoFile: File, interval: number = 5): Promise<{ timestamp: number, blob: Blob }[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
