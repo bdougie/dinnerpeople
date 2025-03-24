@@ -14,10 +14,18 @@ export interface RecipeSummary {
  */
 export const PROMPTS = {
   FRAME_ANALYSIS: 
-    "Describe this cooking step in detail, focusing on the ingredients, techniques, and any important details visible in the frame. Keep it concise but informative. If you see any social media handles (like @username for Instagram/TikTok), please mention them at the end of your description.",
+    `Describe this cooking step in detail, focusing on the ingredients,
+    techniques, and any important details visible in the frame. Keep it concise
+    but informative.`,
   
   SOCIAL_MEDIA_DETECTION:
-    "This is likely an ending frame of a cooking video. Please carefully examine this image for any social media handles or usernames (like @username for Instagram/TikTok, YouTube channel names, etc.). If you see any social profiles, respond with just the platform and username in this format: 'SOCIAL:platform:username'. If no social media information is visible, just respond with 'SOCIAL:none'.",
+    `Analyze the provided image carefully and locate any visible social media
+    handles or usernames (e.g., @username for Instagram/TikTok, YouTube channel
+    names, etc.). Focus on text overlays or prominent text elements in the
+    image. If a social handle is detected, respond in this exact format:
+    ‘SOCIAL:platform:username’ (e.g., ‘SOCIAL:instagram:foodiefromvt’). If no
+    social media handle is visible, respond with ‘SOCIAL:none’. Ignore any
+    blurred faces or unrelated elements in the image.`,
   
   RECIPE_SUMMARY: 
     `Based ONLY on the following chronological cooking steps, create a concise recipe title and detailed description.
@@ -195,8 +203,8 @@ export async function processSocialHandles(
   try {
     const socialHandles = await extractSocialHandles(recipeId, analyzeFrameFn);
     
-    // If social handles are found, store them with the recipe
-    if (socialHandles.length > 0) {
+    // Only update the recipe if social handles were actually found
+    if (socialHandles && socialHandles.length > 0) {
       const { error } = await supabase
         .from('recipes')
         .update({
@@ -205,6 +213,10 @@ export async function processSocialHandles(
         .eq('id', recipeId);
         
       if (error) throw error;
+      
+      console.log('[DEBUG] Updated recipe with social handles:', socialHandles);
+    } else {
+      console.log('[DEBUG] No social handles found, skipping database update');
     }
     
     return socialHandles;

@@ -9,8 +9,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { uploadVideo } from "../lib/storage";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
-import { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase, formatAttribution } from "../lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 import { extractFrames, uploadFrames } from "../lib/video";
 import {
@@ -44,8 +43,8 @@ export default function Upload() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [attribution, setAttribution] = useState({
-    socialHandle: "",
-    sourceUrl: "",
+    handle: "",
+    original_url: "",
   });
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] =
@@ -426,7 +425,8 @@ export default function Upload() {
       try {
         const socialHandles = await processSocialHandles(
           recipeId,
-          ai.analyzeFrame
+          // Fix: Bind the method to the ai instance or use an arrow function
+          (imageUrl, customPrompt) => ai.analyzeFrame(imageUrl, customPrompt)
         );
         console.log(
           "[DEBUG] Social handles extracted and processed:",
@@ -461,17 +461,20 @@ export default function Upload() {
       // Fetch the generated title and description to update the UI
       const { data: updatedRecipeData } = await supabase
         .from("recipes")
-        .select("title, description, social_handles")
+        .select("title, description, attribution")
         .eq("id", recipeId)
         .single();
 
       if (updatedRecipeData) {
         setTitle(updatedRecipeData.title);
         setDescription(updatedRecipeData.description);
-        setAttribution((prev) => ({
-          ...prev,
-          socialHandle: updatedRecipeData.social_handles.join(", "),
-        }));
+        // Only set attribution if it exists
+        if (updatedRecipeData.attribution) {
+          setAttribution({
+            handle: updatedRecipeData.attribution.handle || "",
+            original_url: updatedRecipeData.attribution.original_url || "",
+          });
+        }
       }
     } catch (err: any) {
       console.error("[DEBUG] Error processing frames:", err);
@@ -554,12 +557,17 @@ export default function Upload() {
     if (!recipeId) return;
 
     try {
+      const formattedAttribution = formatAttribution(
+        attribution.handle,
+        attribution.original_url
+      );
+
       const { error: updateError } = await supabase
         .from("recipes")
         .update({
           title,
           description,
-          attribution,
+          attribution: formattedAttribution,
         })
         .eq("id", recipeId);
 
@@ -741,11 +749,11 @@ export default function Upload() {
                       type="text"
                       placeholder="@username"
                       className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
-                      value={attribution.socialHandle}
+                      value={attribution.handle}
                       onChange={(e) =>
                         setAttribution((prev) => ({
                           ...prev,
-                          socialHandle: e.target.value,
+                          handle: e.target.value,
                         }))
                       }
                     />
@@ -753,11 +761,11 @@ export default function Upload() {
                       type="url"
                       placeholder="Original video URL"
                       className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
-                      value={attribution.sourceUrl}
+                      value={attribution.original_url}
                       onChange={(e) =>
                         setAttribution((prev) => ({
                           ...prev,
-                          sourceUrl: e.target.value,
+                          original_url: e.target.value,
                         }))
                       }
                     />
