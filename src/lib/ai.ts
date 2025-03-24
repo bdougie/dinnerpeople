@@ -15,11 +15,11 @@ class AIService {
     );
   }
 
-  async analyzeFrame(imageUrl: string): Promise<string> {
+  async analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
     // Use Ollama for local development, OpenAI for production
     return this.isLocalEnvironment() 
-      ? ollama.analyzeFrame(imageUrl)
-      : openai.analyzeFrame(imageUrl);
+      ? ollama.analyzeFrame(imageUrl, customPrompt)
+      : openai.analyzeFrame(imageUrl, customPrompt);
   }
 
   async storeFrameWithEmbedding(

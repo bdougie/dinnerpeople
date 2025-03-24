@@ -146,7 +146,7 @@ export async function summarizeAndUpdateRecipe(
  */
 export async function extractSocialHandles(
   recipeId: string, 
-  analyzeFrameFn: (imageUrl: string, prompt: string) => Promise<string>
+  analyzeFrameFn: (imageUrl: string, prompt?: string) => Promise<string>
 ): Promise<string[]> {
   try {
     // Get the last 2 frames of the video
@@ -164,6 +164,7 @@ export async function extractSocialHandles(
     
     // Analyze each frame specifically for social media handles
     for (const frame of frames) {
+      // Pass the custom prompt specifically for social media detection
       const result = await analyzeFrameFn(frame.image_url, PROMPTS.SOCIAL_MEDIA_DETECTION);
       
       // Extract social handle if found
@@ -189,7 +190,7 @@ export async function extractSocialHandles(
  */
 export async function processSocialHandles(
   recipeId: string,
-  analyzeFrameFn: (imageUrl: string, prompt: string) => Promise<string>
+  analyzeFrameFn: (imageUrl: string, prompt?: string) => Promise<string>
 ): Promise<string[]> {
   try {
     const socialHandles = await extractSocialHandles(recipeId, analyzeFrameFn);

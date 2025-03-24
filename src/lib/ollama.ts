@@ -100,18 +100,17 @@ class OllamaAPI {
   /**
    * Handle image analysis by including the image data in the prompt text
    */
-  async analyzeFrame(imageUrl: string): Promise<string> {
+  async analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
     if (!this.isLocalEnvironment()) {
       throw new Error('Ollama can only be used in local development environment');
     }
 
     try {
-      // For Ollama, we'll use a text-based approach since the complex
-      // message structure isn't widely supported across all Ollama models
-      const analysisPrompt = `${PromptUtils.PROMPTS.FRAME_ANALYSIS}\n\nI'll describe what I see in this cooking image as requested.`;
+      // Use the custom prompt if provided, otherwise use the default
+      const prompt = customPrompt || PromptUtils.PROMPTS.FRAME_ANALYSIS;
       
       console.log('[DEBUG] Analyzing frame with text-only prompt');
-      return await this.generateCompletion(analysisPrompt);
+      return await this.generateCompletion(prompt);
     } catch (error) {
       console.error('[DEBUG] Error analyzing frame with Ollama:', error);
       // Return a placeholder response if analysis fails

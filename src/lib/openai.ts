@@ -7,7 +7,7 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
-export async function analyzeFrame(imageUrl: string): Promise<string> {
+export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4-vision-preview",
@@ -17,7 +17,7 @@ export async function analyzeFrame(imageUrl: string): Promise<string> {
           content: [
             {
               type: "text",
-              text: PromptUtils.PROMPTS.FRAME_ANALYSIS
+              text: customPrompt || PromptUtils.PROMPTS.FRAME_ANALYSIS
             },
             {
               type: "image_url",
