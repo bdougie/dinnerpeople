@@ -13,7 +13,11 @@ import { supabase } from "../lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import toast, { Toaster } from "react-hot-toast";
 import { extractFrames, uploadFrames } from "../lib/video";
-import { storeFrameWithEmbedding } from "../lib/openai";
+import {
+  storeFrameWithEmbedding,
+  updateRecipeWithSummary,
+} from "../lib/openai";
+import { ai } from "../lib/ai";
 
 interface UploadPreview {
   file: File;
@@ -385,31 +389,22 @@ export default function Upload() {
         `[DEBUG] Successfully uploaded ${uploadedFrames.length} frames`
       );
 
-      // Process and store frames with embeddings
-      console.log("[DEBUG] Processing frames and generating embeddings");
-      for (const frame of uploadedFrames) {
-        try {
-          // Generate a description for the frame
-          // This would typically use image analysis API like OpenAI Vision
-          // For now we'll use a placeholder description based on timestamp
-          const description = `Frame at ${frame.timestamp} seconds showing cooking progress.`;
+      // Process frames using the environment-appropriate AI service
+      console.log("[DEBUG] Processing frames and generating descriptions");
+      await ai.processVideoFrames(recipeId, uploadedFrames);
 
-          // Store frame with embedding
-          await storeFrameWithEmbedding(
-            recipeId,
-            frame.timestamp,
-            description,
-            frame.imageUrl
-          );
+      console.log(
+        "[DEBUG] Frame processing complete, generating recipe summary"
+      );
 
-          console.log(`[DEBUG] Processed frame at ${frame.timestamp}s`);
-        } catch (frameError) {
-          console.error(`[DEBUG] Error processing frame: ${frameError}`);
-          // Continue with other frames even if one fails
-        }
+      // Generate recipe title and description based on processed frames
+      try {
+        await ai.updateRecipeWithSummary(recipeId);
+        console.log("[DEBUG] Recipe summary generated and updated");
+      } catch (summaryError) {
+        console.error("[DEBUG] Error generating recipe summary:", summaryError);
+        // Continue even if summary generation fails
       }
-
-      console.log("[DEBUG] Frame processing complete, updating status");
 
       // Update processing status to completed
       const { error: updateError } = await supabase
@@ -431,6 +426,18 @@ export default function Upload() {
       });
 
       toast.success("Video processing completed successfully!");
+
+      // Fetch the generated title and description to update the UI
+      const { data: updatedRecipeData } = await supabase
+        .from("recipes")
+        .select("title, description")
+        .eq("id", recipeId)
+        .single();
+
+      if (updatedRecipeData) {
+        setTitle(updatedRecipeData.title);
+        setDescription(updatedRecipeData.description);
+      }
     } catch (err: any) {
       console.error("[DEBUG] Error processing frames:", err);
       toast.error(`Error processing video frames: ${err.message}`);

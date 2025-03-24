@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import * as PromptUtils from './prompt-utils';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -12,15 +13,16 @@ interface OllamaResponse {
 interface OllamaImageRequest {
   model: string;
   prompt: string;
-  images: string[];
-  stream: boolean;
+  images?: string[];
+  system?: string;
+  stream?: boolean;
 }
 
 class OllamaAPI {
   private baseUrl: string;
   private model: string;
 
-  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama2-vision') {
+  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama3-vision') {
     this.baseUrl = baseUrl;
     this.model = model;
   }
@@ -33,7 +35,31 @@ class OllamaAPI {
     );
   }
 
-  private async generateImageCompletion(prompt: string, imageUrls: string[]): Promise<string> {
+  /**
+   * Convert an image URL to base64 for Ollama
+   */
+  private async imageUrlToBase64(url: string): Promise<string> {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          // Remove prefix (e.g., "data:image/jpeg;base64,") to get just the base64 data
+          const base64Only = base64data.split(',')[1];
+          resolve(base64Only);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting image URL to base64:', error);
+      throw error;
+    }
+  }
+
+  private async generateTextCompletion(prompt: string): Promise<string> {
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -41,11 +67,10 @@ class OllamaAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.model,
+          model: 'llama3',  // Use llama3 for text-only completions
           prompt,
-          images: imageUrls,
           stream: false,
-        } as OllamaImageRequest),
+        }),
       });
 
       if (!response.ok) {
@@ -55,8 +80,68 @@ class OllamaAPI {
       const data = await response.json() as OllamaResponse;
       return data.response;
     } catch (error) {
-      console.error('Error calling Ollama API:', error);
+      console.error('Error calling Ollama API for text:', error);
       throw error;
+    }
+  }
+
+  private async generateImageCompletion(prompt: string, imageUrls: string[]): Promise<string> {
+    try {
+      // For text-only prompts, use the text completion function
+      if (!imageUrls || imageUrls.length === 0) {
+        return this.generateTextCompletion(prompt);
+      }
+
+      // Convert image URLs to base64 for Ollama
+      const base64Images = await Promise.all(
+        imageUrls.map(url => this.imageUrlToBase64(url))
+      );
+
+      console.log(`[DEBUG] Sending ${base64Images.length} images to Ollama`);
+      
+      const response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                ...base64Images.map(base64 => ({
+                  type: "image_url",
+                  image_url: { url: `data:image/jpeg;base64,${base64}` }
+                }))
+              ]
+            }
+          ],
+          stream: false
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[DEBUG] Ollama error response:`, errText);
+        throw new Error(`Ollama API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.message?.content || '';
+    } catch (error) {
+      console.error('Error calling Ollama API:', error);
+      
+      // Fallback to text-only if image processing fails
+      console.log('[DEBUG] Falling back to text-only completion');
+      try {
+        return await this.generateTextCompletion(
+          `${prompt}\n\nNote: I couldn't process the image, but please try to answer based on this text.`
+        );
+      } catch (fallbackError) {
+        throw error; // Throw the original error if fallback also fails
+      }
     }
   }
 
@@ -65,33 +150,13 @@ class OllamaAPI {
       throw new Error('Ollama can only be used in local development environment');
     }
 
-    const prompt = `You are a culinary expert. Analyze this cooking image and provide a detailed description of what you see.
-    Focus on:
-    1. Ingredients visible in the frame
-    2. Cooking techniques being demonstrated
-    3. Stage of the cooking process
-    4. Any special equipment or tools being used
-    5. Important details about temperature, timing, or technique
-    
-    Keep the description clear, concise, and informative. Format your response in a natural, flowing paragraph.`;
-
     try {
-      // Convert image URL to base64 if it's a local blob URL
-      let imageData = imageUrl;
-      if (imageUrl.startsWith('blob:')) {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        imageData = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      }
-
-      return await this.generateImageCompletion(prompt, [imageData]);
+      const prompt = PromptUtils.PROMPTS.FRAME_ANALYSIS;
+      return await this.generateImageCompletion(prompt, [imageUrl]);
     } catch (error) {
-      console.error('Error analyzing frame:', error);
-      throw error;
+      console.error('[DEBUG] Error analyzing frame with Ollama:', error);
+      // Return a placeholder response if analysis fails
+      return "A cooking step showing food preparation. Unable to provide more details.";
     }
   }
 
@@ -146,58 +211,37 @@ class OllamaAPI {
     return descriptions;
   }
 
-  async generateRecipeSummary(videoId: string): Promise<{ title: string; description: string; ingredients: string[] }> {
+  /**
+   * Generate recipe summary based on cooking steps
+   */
+  async generateRecipeSummary(cookingSteps: string): Promise<PromptUtils.RecipeSummary> {
     if (!this.isLocalEnvironment()) {
       throw new Error('Ollama can only be used in local development environment');
     }
 
     try {
-      // Get all frame descriptions for this recipe
-      const { data: frames, error } = await supabase
-        .from('frame_descriptions')
-        .select('description')
-        .eq('recipe_id', videoId)
-        .order('timestamp', { ascending: true });
-
-      if (error) throw error;
-
-      const descriptions = frames.map(f => f.description).join('\n');
-
-      const prompt = `Based on these step-by-step cooking descriptions, generate a recipe summary:
-
-      ${descriptions}
-
-      Provide the following in JSON format:
-      1. A catchy title for the recipe
-      2. A brief, engaging description
-      3. A list of all ingredients mentioned
-
-      Format your response as valid JSON with these keys: title, description, ingredients`;
-
-      const response = await this.generateImageCompletion(prompt, []);
+      const prompt = PromptUtils.PROMPTS.RECIPE_SUMMARY.replace('{steps}', cookingSteps);
       
-      try {
-        // Try to parse the response as JSON
-        const parsed = JSON.parse(response);
-        return {
-          title: parsed.title || 'Untitled Recipe',
-          description: parsed.description || 'No description available',
-          ingredients: parsed.ingredients || []
-        };
-      } catch (e) {
-        console.error('Failed to parse Ollama response as JSON:', e);
-        return {
-          title: 'Untitled Recipe',
-          description: response,
-          ingredients: []
-        };
-      }
+      // No images for recipe summary, so using text-only completion
+      const response = await this.generateImageCompletion(prompt, []);
+      return PromptUtils.parseRecipeSummaryResponse(response);
     } catch (error) {
-      console.error('Error generating recipe summary:', error);
-      throw error;
+      console.error('Error generating recipe summary with Ollama:', error);
+      return {
+        title: 'Untitled Recipe',
+        description: 'This recipe was created automatically from a cooking video.'
+      };
     }
+  }
+
+  /**
+   * Complete recipe summarization with Ollama
+   */
+  async updateRecipeWithSummary(recipeId: string): Promise<void> {
+    return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
   }
 }
 
 // Create and export a singleton instance
-export const ollama = new OllamaAPI('http://localhost:11434', 'llama2-vision');
+// Try to use llama3-vision or fall back to llama3 if vision model isn't available
+export const ollama = new OllamaAPI('http://localhost:11434', 'llama3-vision');

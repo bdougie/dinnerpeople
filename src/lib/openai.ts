@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { supabase } from './supabase';
+import * as PromptUtils from './prompt-utils';
 
 const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
@@ -16,7 +17,7 @@ export async function analyzeFrame(imageUrl: string): Promise<string> {
           content: [
             {
               type: "text",
-              text: "Describe this cooking step in detail, focusing on the ingredients, techniques, and any important details visible in the frame. Keep it concise but informative."
+              text: PromptUtils.PROMPTS.FRAME_ANALYSIS
             },
             {
               type: "image_url",
@@ -101,4 +102,46 @@ export async function processVideoFrames(videoId: string, frames: { timestamp: n
   }
 
   return descriptions;
+}
+
+/**
+ * Generate a recipe title and description based on analyzed frames using OpenAI
+ */
+export async function generateRecipeSummary(cookingSteps: string): Promise<PromptUtils.RecipeSummary> {
+  try {
+    // Format the prompt with the cooking steps
+    const prompt = PromptUtils.PROMPTS.RECIPE_SUMMARY.replace('{steps}', cookingSteps);
+    
+    // Use OpenAI to generate a title and description
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: [
+        {
+          role: "system", 
+          content: "You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+    
+    const responseText = response.choices[0]?.message?.content || '';
+    return PromptUtils.parseRecipeSummaryResponse(responseText);
+  } catch (error) {
+    console.error('Error generating recipe summary with OpenAI:', error);
+    return {
+      title: 'Untitled Recipe',
+      description: 'This recipe was created automatically from a cooking video.'
+    };
+  }
+}
+
+/**
+ * Update recipe with AI-generated title and description
+ */
+export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
+  return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
 }
