@@ -24,7 +24,9 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
             },
             {
               type: "image_url",
-              image_url: imageUrl
+              image_url: {
+                url: imageUrl
+              }
             }
           ]
         }
