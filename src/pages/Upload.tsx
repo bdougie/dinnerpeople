@@ -390,8 +390,23 @@ export default function Upload() {
         `[DEBUG] Successfully uploaded ${uploadedFrames.length} frames`
       );
 
-      // Process frames using the environment-appropriate AI service
+      // Update processing steps to show "analysis" as current
+      setProcessingSteps((steps) =>
+        steps.map((step) => ({
+          ...step,
+          status:
+            step.id === "upload"
+              ? "completed"
+              : step.id === "frames"
+              ? "completed"
+              : step.id === "analysis"
+              ? "current"
+              : "waiting",
+        }))
+      );
+
       console.log("[DEBUG] Processing frames and generating descriptions");
+      // Process frames using the environment-appropriate AI service
       await ai.processVideoFrames(recipeId, uploadedFrames);
 
       console.log(
