@@ -140,6 +140,41 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
 }
 
 /**
+ * Generate a recipe summary with a custom prompt
+ */
+export async function generateRecipeSummaryWithCustomPrompt(
+  cookingSteps: string,
+  customPrompt: string
+): Promise<PromptUtils.RecipeSummary> {
+  try {
+    // Use OpenAI to generate a title and description with the custom prompt
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: [
+        {
+          role: "system", 
+          content: "You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions."
+        },
+        {
+          role: "user",
+          content: customPrompt
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+    
+    const responseText = response.choices[0]?.message?.content || '';
+    return PromptUtils.parseRecipeSummaryResponse(responseText);
+  } catch (error) {
+    console.error('Error generating recipe summary with custom prompt:', error);
+    return {
+      title: 'Error Generating Recipe',
+      description: 'There was an error processing this recipe with the custom prompt.'
+    };
+  }
+}
+
+/**
  * Update recipe with AI-generated title and description
  */
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {

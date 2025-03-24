@@ -28,9 +28,10 @@ class AIService {
     description: string,
     imageUrl: string
   ): Promise<void> {
-    // Always use OpenAI for embeddings, even in local environment
-    // This is because we need consistent embeddings for vector search
-    return openai.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl);
+    // Use Ollama for local development, OpenAI for production
+    return this.isLocalEnvironment()
+      ? ollama.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl)
+      : openai.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl);
   }
 
   async updateRecipeWithSummary(recipeId: string): Promise<void> {
@@ -62,6 +63,19 @@ class AIService {
         // Continue with other frames even if one fails
       }
     }
+  }
+
+  /**
+   * Generate a recipe summary with a custom prompt
+   */
+  async generateRecipeSummaryWithCustomPrompt(
+    cookingSteps: string,
+    customPrompt: string
+  ): Promise<RecipeSummary> {
+    // Use Ollama for local development, OpenAI for production
+    return this.isLocalEnvironment()
+      ? ollama.generateRecipeSummaryWithCustomPrompt(cookingSteps, customPrompt)
+      : openai.generateRecipeSummaryWithCustomPrompt(cookingSteps, customPrompt);
   }
 }
 

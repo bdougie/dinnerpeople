@@ -114,7 +114,7 @@ class OllamaAPI {
     } catch (error) {
       console.error('[DEBUG] Error analyzing frame with Ollama:', error);
       // Return a placeholder response if analysis fails
-      return "A cooking step showing food preparation. Unable to provide more details due to processing limitations.";
+      return `Unable to provide more details due to processing limitations. ${imageUrl}`;
     }
   }
 
@@ -154,6 +154,92 @@ class OllamaAPI {
     }
 
     return descriptions;
+  }
+
+  /**
+   * Generate embeddings using Ollama with nomic-embed-text model
+   */
+  async generateEmbedding(text: string): Promise<number[]> {
+    if (!this.isLocalEnvironment()) {
+      throw new Error('Ollama can only be used in local development environment');
+    }
+
+    try {
+      console.log('[DEBUG] Generating embedding with nomic-embed-text');
+      
+      const response = await fetch(`${this.baseUrl}/api/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'nomic-embed-text',
+          prompt: text,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[DEBUG] Ollama embedding error: ${errText}`);
+        
+        if (errText.includes("model") && errText.includes("not found")) {
+          console.error(`[DEBUG] Model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
+          throw new Error(`Ollama model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
+        }
+        
+        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.embedding;
+    } catch (error) {
+      console.error('[DEBUG] Error generating embedding with Ollama:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store frame with embedding using Ollama's nomic-embed-text
+   */
+  async storeFrameWithEmbedding(
+    recipeId: string,
+    timestamp: number,
+    description: string,
+    imageUrl: string
+  ): Promise<void> {
+    if (!this.isLocalEnvironment()) {
+      throw new Error('Ollama can only be used in local development environment');
+    }
+
+    try {
+      // Generate embedding for the frame description
+      console.log(`[DEBUG] Generating embedding for frame at ${timestamp}s`);
+      const embedding = await this.generateEmbedding(description);
+      
+      // Check embedding dimensions
+      if (embedding.length !== 1536) {
+        console.warn(`[DEBUG] Warning: Embedding dimension (${embedding.length}) doesn't match expected 1536 dimensions`);
+        // You may need to pad or truncate the embedding if dimensions don't match
+      }
+      
+      // Store frame with embedding in Supabase
+      const { error } = await supabase
+        .from('video_frames')
+        .insert({
+          recipe_id: recipeId,
+          timestamp: timestamp,
+          description: description,
+          image_url: imageUrl,
+          embedding: embedding
+        });
+        
+      if (error) throw error;
+      
+      console.log(`[DEBUG] Successfully stored frame with embedding at ${timestamp}s`);
+    } catch (error) {
+      console.error('[DEBUG] Error storing frame with embedding:', error);
+      throw error;
+    }
   }
 
   /**
@@ -201,7 +287,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       console.error('[DEBUG] Error generating recipe summary with Ollama:', error);
       return {
         title: 'Untitled Recipe',
-        description: 'This recipe was created automatically from a cooking video.'
+        description: `Unable to generate a summary for this recipe due to processing limitations.`
       };
     }
   }
@@ -243,6 +329,46 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       console.error('[DEBUG] Error updating recipe with summary:', error);
       throw error;
     }
+  }
+}
+
+/**
+ * Generate a recipe summary with a custom prompt for local testing
+ */
+export async function generateRecipeSummaryWithCustomPrompt(
+  cookingSteps: string,
+  customPrompt: string
+): Promise<PromptUtils.RecipeSummary> {
+  try {
+    if (!window.location.hostname.includes('localhost') && 
+        !window.location.hostname.includes('127.0.0.1') &&
+        !window.location.hostname.includes('local-credentialless.webcontainer-api.io')) {
+      throw new Error('Ollama can only be used in local development environment');
+    }
+    
+    // Replace the steps placeholder in the custom prompt
+    const formattedPrompt = customPrompt.replace('{steps}', cookingSteps);
+    
+    // Use Ollama locally to generate a summary with the custom prompt
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama3',
+        prompt: formattedPrompt,
+        system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
+        format: 'json'
+      })
+    });
+    
+    const data = await response.json();
+    return PromptUtils.parseRecipeSummaryResponse(data.response);
+  } catch (error) {
+    console.error('Error generating recipe summary with Ollama:', error);
+    return {
+      title: 'Error Generating Recipe',
+      description: 'There was an error processing this recipe with the custom prompt in Ollama.'
+    };
   }
 }
 
