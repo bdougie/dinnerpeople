@@ -32,7 +32,7 @@
       - Create video frames for their recipes
 */
 
--- Create recipes table
+-- Create recipes table if it doesn't exist
 CREATE TABLE IF NOT EXISTS recipes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   updated_at timestamptz DEFAULT now()
 );
 
--- Create video_frames table
+-- Create video_frames table if it doesn't exist
 CREATE TABLE IF NOT EXISTS video_frames (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recipe_id uuid REFERENCES recipes(id) ON DELETE CASCADE NOT NULL,
@@ -56,57 +56,9 @@ CREATE TABLE IF NOT EXISTS video_frames (
   created_at timestamptz DEFAULT now()
 );
 
--- Enable Row Level Security
-ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE video_frames ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security (if not already enabled)
+ALTER TABLE IF EXISTS recipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS video_frames ENABLE ROW LEVEL SECURITY;
 
--- Policies for recipes
-CREATE POLICY "Users can read own recipes"
-  ON recipes
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create recipes"
-  ON recipes
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own recipes"
-  ON recipes
-  FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own recipes"
-  ON recipes
-  FOR DELETE
-  TO authenticated
-  USING (auth.uid() = user_id);
-
--- Policies for video_frames
-CREATE POLICY "Users can read frames of own recipes"
-  ON video_frames
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM recipes
-      WHERE recipes.id = video_frames.recipe_id
-      AND recipes.user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can create frames for own recipes"
-  ON video_frames
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM recipes
-      WHERE recipes.id = video_frames.recipe_id
-      AND recipes.user_id = auth.uid()
-    )
-  );
+-- Skip all policy creation since they were created in previous migration
+-- This migration is essentially a duplicate of 20250323035331_raspy_island.sql
