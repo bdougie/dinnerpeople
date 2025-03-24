@@ -148,5 +148,36 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
  * Update recipe with AI-generated title and description
  */
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
-  return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
+  try {
+    // Get existing recipe data
+    const { data: existingRecipe, error: fetchError } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Generate the recipe summary
+    const summary = await generateRecipeSummary(
+      existingRecipe.cooking_steps || ''
+    );
+    
+    // Update only fields we know exist in the schema
+    const { error: updateError } = await supabase
+      .from('recipes')
+      .update({
+        title: summary.title,
+        description: summary.description,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', recipeId);
+      
+    if (updateError) throw updateError;
+    
+    console.log(`Updated recipe ${recipeId} with AI-generated summary`);
+  } catch (error) {
+    console.error('Error updating recipe with summary:', error);
+    throw error;
+  }
 }
