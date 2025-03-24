@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { supabase } from './supabase';
+import { supabase, formatAttribution } from './supabase';
 import * as PromptUtils from './prompt-utils';
 
 const openai = new OpenAI({
@@ -7,10 +7,13 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
+// Update model name from gpt-4-vision-preview to gpt-4o-mini
+const MODEL = 'gpt-4o-mini';
+
 export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: MODEL,
       messages: [
         {
           role: "user",
@@ -21,7 +24,9 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
             },
             {
               type: "image_url",
-              image_url: imageUrl
+              image_url: {
+                url: imageUrl
+              }
             }
           ]
         }
@@ -140,8 +145,46 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
 }
 
 /**
- * Update recipe with AI-generated title and description
+ * Complete recipe summarization with OpenAI
  */
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
-  return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
+  try {
+    // Get existing recipe data
+    const { data: existingRecipe, error: fetchError } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', recipeId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Generate the recipe summary
+    const summary = await generateRecipeSummary(
+      existingRecipe.cooking_steps || ''
+    );
+    
+    // Format any attribution data using the correct function
+    const attributionData = formatAttribution(
+      existingRecipe.temp_handle || '', 
+      existingRecipe.temp_video_url || ''
+    );
+    
+    // Update only fields we know exist in the schema
+    const { error: updateError } = await supabase
+      .from('recipes')
+      .update({
+        title: summary.title,
+        description: summary.description,
+        attribution: attributionData, // Use the properly formatted attribution JSONB
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', recipeId);
+      
+    if (updateError) throw updateError;
+    
+    console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
+  } catch (error) {
+    console.error('[DEBUG] Error updating recipe with summary:', error);
+    throw error;
+  }
 }
