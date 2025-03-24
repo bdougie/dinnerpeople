@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { supabase } from './supabase';
+import { supabase, formatAttribution } from './supabase';
 import * as PromptUtils from './prompt-utils';
 
 const openai = new OpenAI({
@@ -145,7 +145,7 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
 }
 
 /**
- * Update recipe with AI-generated title and description
+ * Complete recipe summarization with OpenAI
  */
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
   try {
@@ -163,21 +163,28 @@ export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
       existingRecipe.cooking_steps || ''
     );
     
+    // Format any attribution data using the correct function
+    const attributionData = formatAttribution(
+      existingRecipe.temp_handle || '', 
+      existingRecipe.temp_video_url || ''
+    );
+    
     // Update only fields we know exist in the schema
     const { error: updateError } = await supabase
       .from('recipes')
       .update({
         title: summary.title,
         description: summary.description,
+        attribution: attributionData, // Use the properly formatted attribution JSONB
         updated_at: new Date().toISOString()
       })
       .eq('id', recipeId);
       
     if (updateError) throw updateError;
     
-    console.log(`Updated recipe ${recipeId} with AI-generated summary`);
+    console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
   } catch (error) {
-    console.error('Error updating recipe with summary:', error);
+    console.error('[DEBUG] Error updating recipe with summary:', error);
     throw error;
   }
 }
