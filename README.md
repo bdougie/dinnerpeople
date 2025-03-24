@@ -351,3 +351,66 @@ To apply migrations to your production Supabase instance:
    supabase db push
    ```
 
+## Local Supabase Development Workflow
+
+### Starting Local Supabase
+
+1. Start the local Supabase instance:
+   ```bash
+   supabase start
+   ```
+   This will launch all Supabase services in Docker containers.
+
+2. The CLI will output details including:
+   - Studio URL: http://localhost:54323
+   - API URL: http://localhost:54321
+   - DB URL: postgresql://postgres:postgres@localhost:54322/postgres
+   - anon key, service_role key, etc.
+
+### Working with Migrations Locally
+
+1. Apply migrations to your local instance:
+   ```bash
+   supabase migration up
+   ```
+
+2. Test your changes in the local environment 
+
+3. Create new migrations when needed:
+   ```bash
+   supabase migration new my_migration_name
+   ```
+   This creates a timestamped migration file in `supabase/migrations/`.
+
+4. Edit your migration file, then apply it locally:
+   ```bash
+   supabase migration up
+   ```
+
+5. Reset local database if needed:
+   ```bash
+   supabase db reset
+   ```
+   This will wipe your local database and reapply all migrations.
+
+### Deploying to Production
+
+Once you've tested locally and are ready to deploy:
+
+1. Link to your remote project (if not already done):
+   ```bash
+   supabase link --project-ref oryvyobhmvztbwjzzllo
+   ```
+
+2. Push migration changes to production:
+   ```bash
+   supabase db push
+   ```
+
+3. Or apply specific migrations:
+   ```bash
+   supabase migration up --db-url "postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+   ```
+
+Remember to always test migrations locally before applying them to production.
+
