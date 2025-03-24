@@ -18,6 +18,7 @@ import {
   updateRecipeWithSummary,
 } from "../lib/openai";
 import { ai } from "../lib/ai";
+import { processSocialHandles } from "../lib/prompt-utils";
 
 interface UploadPreview {
   file: File;
@@ -406,6 +407,21 @@ export default function Upload() {
         // Continue even if summary generation fails
       }
 
+      // Extract and process social handles
+      try {
+        const socialHandles = await processSocialHandles(
+          recipeId,
+          ai.analyzeFrame
+        );
+        console.log(
+          "[DEBUG] Social handles extracted and processed:",
+          socialHandles
+        );
+      } catch (socialError) {
+        console.error("[DEBUG] Error processing social handles:", socialError);
+        // Continue even if social handle extraction fails
+      }
+
       // Update processing status to completed
       const { error: updateError } = await supabase
         .from("processing_queue")
@@ -430,13 +446,17 @@ export default function Upload() {
       // Fetch the generated title and description to update the UI
       const { data: updatedRecipeData } = await supabase
         .from("recipes")
-        .select("title, description")
+        .select("title, description, social_handles")
         .eq("id", recipeId)
         .single();
 
       if (updatedRecipeData) {
         setTitle(updatedRecipeData.title);
         setDescription(updatedRecipeData.description);
+        setAttribution((prev) => ({
+          ...prev,
+          socialHandle: updatedRecipeData.social_handles.join(", "),
+        }));
       }
     } catch (err: any) {
       console.error("[DEBUG] Error processing frames:", err);
