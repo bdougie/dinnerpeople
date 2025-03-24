@@ -79,6 +79,13 @@ class OllamaAPI {
       if (!response.ok) {
         const errText = await response.text();
         console.error(`[DEBUG] Ollama error response: ${errText}`);
+        
+        // Check for model not found error and provide helpful message
+        if (errText.includes("model") && errText.includes("not found")) {
+          console.error(`[DEBUG] Model '${this.model}' not found. Please run: ollama pull ${this.model}`);
+          throw new Error(`Ollama model '${this.model}' not found. Please run: ollama pull ${this.model}`);
+        }
+        
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
       }
 
