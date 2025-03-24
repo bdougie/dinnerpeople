@@ -14,7 +14,10 @@ export interface RecipeSummary {
  */
 export const PROMPTS = {
   FRAME_ANALYSIS: 
-    "Describe this cooking step in detail, focusing on the ingredients, techniques, and any important details visible in the frame. Keep it concise but informative.",
+    "Describe this cooking step in detail, focusing on the ingredients, techniques, and any important details visible in the frame. Keep it concise but informative. If you see any social media handles (like @username for Instagram/TikTok), please mention them at the end of your description.",
+  
+  SOCIAL_MEDIA_DETECTION:
+    "This is likely an ending frame of a cooking video. Please carefully examine this image for any social media handles or usernames (like @username for Instagram/TikTok, YouTube channel names, etc.). If you see any social profiles, respond with just the platform and username in this format: 'SOCIAL:platform:username'. If no social media information is visible, just respond with 'SOCIAL:none'.",
   
   RECIPE_SUMMARY: 
     `Based ONLY on the following chronological cooking steps, create a concise recipe title and detailed description.
@@ -135,5 +138,77 @@ export async function summarizeAndUpdateRecipe(
     };
     await updateRecipeWithGeneratedSummary(recipeId, fallback);
     return fallback;
+  }
+}
+
+/**
+ * Extract social media handles from end frames
+ */
+export async function extractSocialHandles(
+  recipeId: string, 
+  analyzeFrameFn: (imageUrl: string, prompt: string) => Promise<string>
+): Promise<string[]> {
+  try {
+    // Get the last 2 frames of the video
+    const { data: frames, error } = await supabase
+      .from('video_frames')
+      .select('image_url')
+      .eq('recipe_id', recipeId)
+      .order('timestamp', { ascending: false })
+      .limit(2);
+    
+    if (error) throw error;
+    if (!frames || frames.length === 0) return [];
+    
+    const socialHandles: string[] = [];
+    
+    // Analyze each frame specifically for social media handles
+    for (const frame of frames) {
+      const result = await analyzeFrameFn(frame.image_url, PROMPTS.SOCIAL_MEDIA_DETECTION);
+      
+      // Extract social handle if found
+      if (result.includes('SOCIAL:') && !result.includes('SOCIAL:none')) {
+        const handleMatch = result.match(/SOCIAL:([^:]+):(.+)/);
+        if (handleMatch && handleMatch.length >= 3) {
+          const platform = handleMatch[1].trim();
+          const username = handleMatch[2].trim();
+          socialHandles.push(`${platform}:${username}`);
+        }
+      }
+    }
+    
+    return [...new Set(socialHandles)]; // Remove duplicates
+  } catch (error) {
+    console.error('Error extracting social handles:', error);
+    return [];
+  }
+}
+
+/**
+ * Process social handles and update the recipe
+ */
+export async function processSocialHandles(
+  recipeId: string,
+  analyzeFrameFn: (imageUrl: string, prompt: string) => Promise<string>
+): Promise<string[]> {
+  try {
+    const socialHandles = await extractSocialHandles(recipeId, analyzeFrameFn);
+    
+    // If social handles are found, store them with the recipe
+    if (socialHandles.length > 0) {
+      const { error } = await supabase
+        .from('recipes')
+        .update({
+          social_handles: socialHandles
+        })
+        .eq('id', recipeId);
+        
+      if (error) throw error;
+    }
+    
+    return socialHandles;
+  } catch (error) {
+    console.error('Error processing social handles:', error);
+    return [];
   }
 }
