@@ -21,7 +21,7 @@ class OllamaAPI {
   private baseUrl: string;
   private model: string;
 
-  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama3') {
+  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama3.2-vision:11b') {
     this.baseUrl = baseUrl;
     this.model = model;
   }
