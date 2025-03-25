@@ -180,3 +180,10 @@ export async function generateRecipeSummaryWithCustomPrompt(
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
   return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
 }
+
+/**
+ * Generate recipe summary without updating the database (for previews)
+ */
+export async function summarize(recipeId: string): Promise<PromptUtils.RecipeSummary> {
+  return PromptUtils.summarize(recipeId, generateRecipeSummary);
+}

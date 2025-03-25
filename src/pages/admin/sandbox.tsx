@@ -274,6 +274,12 @@ const AdminSandbox: React.FC = () => {
                 <div className="text-sm text-gray-600">
                   <p>Frame ID: {selectedFrameId}</p>
                   <p>Timestamp: {getSelectedFrame()?.timestamp}s</p>
+                  <p className="mt-2">
+                    <span className="font-semibold">Description:</span>
+                    <br />
+                    {getSelectedFrame()?.description ||
+                      "No description available"}
+                  </p>
                 </div>
               )}
             </div>

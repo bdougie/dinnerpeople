@@ -164,6 +164,32 @@ export async function summarizeAndUpdateRecipe(
 }
 
 /**
+ * Generate recipe summary from frame descriptions without database updates
+ * This is useful for preview or testing purposes
+ */
+export async function summarize(
+  recipeId: string,
+  generateSummaryFn: (cookingSteps: string) => Promise<RecipeSummary>
+): Promise<RecipeSummary> {
+  try {
+    // Get frame descriptions
+    const descriptions = await getFrameDescriptions(recipeId);
+    
+    // Format cooking steps
+    const cookingSteps = formatCookingSteps(descriptions);
+    
+    // Generate summary using the provided function (either OpenAI or Ollama)
+    return await generateSummaryFn(cookingSteps);
+  } catch (error) {
+    console.error('Error in summarize:', error);
+    return {
+      title: 'Unknown Recipe',
+      description: 'The recipe content could not be determined from the video frames.'
+    };
+  }
+}
+
+/**
  * Extract social media handles from end frames
  */
 export async function extractSocialHandles(

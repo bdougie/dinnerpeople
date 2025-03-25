@@ -325,42 +325,10 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
   }
 
   /**
-   * Complete recipe summarization with Ollama
+   * Update recipe with AI-generated title and description
    */
   async updateRecipeWithSummary(recipeId: string): Promise<void> {
-    try {
-      // Get existing recipe data to ensure we're not losing information
-      const { data: existingRecipe, error: fetchError } = await supabase
-        .from('recipes')
-        .select('*')
-        .eq('id', recipeId)
-        .single();
-        
-      if (fetchError) throw fetchError;
-      
-      // Generate the recipe summary
-      const summary = await this.generateRecipeSummary(
-        existingRecipe.cooking_steps || ''
-      );
-      
-      // Update only fields we know exist in the schema
-      const { error: updateError } = await supabase
-        .from('recipes')
-        .update({
-          title: summary.title,
-          description: summary.description,
-          // Remove reference to ai_generated column
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', recipeId);
-        
-      if (updateError) throw updateError;
-      
-      console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
-    } catch (error) {
-      console.error('[DEBUG] Error updating recipe with summary:', error);
-      throw error;
-    }
+    return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
   }
 }
 

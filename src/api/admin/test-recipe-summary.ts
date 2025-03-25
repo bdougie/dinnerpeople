@@ -1,30 +1,24 @@
-import * as PromptUtils from '../../lib/prompt-utils';
 import { ai } from '../../lib/ai';
 
 export default async function handler(req, res) {
-  // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { recipeId, prompt } = req.body;
+    const { frames, prompt } = req.body;
     
-    if (!recipeId) {
-      return res.status(400).json({ error: 'Recipe ID is required' });
+    if (!frames || !Array.isArray(frames)) {
+      return res.status(400).json({ error: 'Frame data is required and must be an array' });
     }
     
-    // Get frame descriptions
-    const descriptions = await PromptUtils.getFrameDescriptions(recipeId);
+    // Format descriptions into cooking steps
+    const cookingSteps = frames
+      .map(frame => frame.description)
+      .join('\n\n');
     
-    // Format cooking steps
-    const cookingSteps = PromptUtils.formatCookingSteps(descriptions);
-    
-    // Use the AI service to generate the summary with the custom prompt
-    const summary = await ai.generateRecipeSummaryWithCustomPrompt(
-      cookingSteps, 
-      prompt.replace('{steps}', cookingSteps)
-    );
+    // Use the AI service to generate a summary with the custom prompt
+    const summary = await ai.generateRecipeSummaryWithCustomPrompt(cookingSteps, prompt);
     
     return res.status(200).json({ summary });
   } catch (error) {
