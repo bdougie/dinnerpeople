@@ -14,9 +14,10 @@ export interface RecipeSummary {
  */
 export const PROMPTS = {
   FRAME_ANALYSIS: 
-    `Describe this cooking step in detail, focusing on the ingredients,
-    techniques, and any important details visible in the frame. Keep it concise
-    but informative.`,
+    `Analyze this image and identify the food shown. 
+    If you are uncertain, DO NOT GUESS specific dishes.
+    Instead, describe what you can see with certainty (colors, textures, etc).
+    Is this: 1) A dessert, 2) A main dish, 3) A side dish, 4) Something else?`,
   
   SOCIAL_MEDIA_DETECTION:
     `Analyze the provided image carefully and locate any visible social media
@@ -28,18 +29,18 @@ export const PROMPTS = {
     blurred faces or unrelated elements in the image.`,
   
   RECIPE_SUMMARY: 
-    `Based ONLY on the following chronological cooking steps, create a concise recipe title and detailed description.
+    `Based on the following video frame descriptions, create a concise recipe title and detailed description.
     The title should be appealing, descriptive, and under 60 characters.
-    The description should be 2-3 sentences summarizing the dish, key ingredients, and cooking methods.
+    The description should be 2-3 sentences summarizing the dish, key ingredients, and cooking methods seen in the video.
     
-    DO NOT invent or add any ingredients or steps that are not mentioned in the provided cooking steps.
-    ONLY use information that appears in the provided steps.
-    
-    Cooking steps:
+    Video frame descriptions:
     {steps}
     
-    Format your response as valid JSON with 'title' and 'description' fields only.
-    Example: {"title": "Recipe Title", "description": "Recipe description text"}`
+    YOU MUST FORMAT YOUR RESPONSE AS VALID JSON with only 'title' and 'description' fields.
+    For example: {"title": "Recipe Title", "description": "Recipe description text"}
+    
+    If you cannot determine what the recipe is about, respond with:
+    {"title": "Unknown Recipe", "description": "The recipe content could not be determined from the video frames."}`
 }
 
 /**
@@ -72,8 +73,18 @@ export function formatCookingSteps(descriptions: string[]): string {
  * Parse JSON response or return default values
  */
 export function parseRecipeSummaryResponse(response: string): RecipeSummary {
+  // Log the raw response to see what we're getting
+  console.log('[DEBUG] Raw response before parsing:', response);
+  console.log('[DEBUG] Response type:', typeof response);
+  console.log('[DEBUG] Response length:', response?.length);
+  
   try {
+    // Log the first 100 characters to get a preview
+    console.log('[DEBUG] Response preview:', response?.substring(0, 100));
+    
     const parsed = JSON.parse(response);
+    console.log('[DEBUG] Successfully parsed JSON:', parsed);
+    
     return {
       title: parsed.title || 'Untitled Recipe',
       description: parsed.description || 'No description available',
@@ -81,9 +92,12 @@ export function parseRecipeSummaryResponse(response: string): RecipeSummary {
     };
   } catch (e) {
     console.error('Failed to parse AI response as JSON:', e);
+    // Log more details about the error
+    console.error('[DEBUG] Error details:', e.message);
+    
     return {
-      title: 'Untitled Recipe',
-      description: response || 'This recipe was created automatically from a cooking video.',
+      title: 'Unknown Recipe',
+      description: 'The recipe content could not be determined from the video frames.',
       ingredients: []
     };
   }
@@ -141,8 +155,8 @@ export async function summarizeAndUpdateRecipe(
   } catch (error) {
     console.error('Error in summarizeAndUpdateRecipe:', error);
     const fallback = {
-      title: 'Untitled Recipe',
-      description: 'This recipe was created automatically from a cooking video.'
+      title: 'Unknown Recipe',
+      description: 'The recipe content could not be determined from the video frames.'
     };
     await updateRecipeWithGeneratedSummary(recipeId, fallback);
     return fallback;
@@ -205,16 +219,21 @@ export async function processSocialHandles(
     
     // Only update the recipe if social handles were actually found
     if (socialHandles && socialHandles.length > 0) {
-      const { error } = await supabase
-        .from('recipes')
-        .update({
-          social_handles: socialHandles
-        })
-        .eq('id', recipeId);
-        
-      if (error) throw error;
+      // Store social handles in a separate table instead of as a column
+      for (const handle of socialHandles) {
+        const [platform, username] = handle.split(':');
+        const { error } = await supabase
+          .from('recipe_social_media')
+          .insert({
+            recipe_id: recipeId,
+            platform,
+            username
+          });
+          
+        if (error) console.error('Error storing social handle:', error);
+      }
       
-      console.log('[DEBUG] Updated recipe with social handles:', socialHandles);
+      console.log('[DEBUG] Stored recipe social handles:', socialHandles);
     } else {
       console.log('[DEBUG] No social handles found, skipping database update');
     }
