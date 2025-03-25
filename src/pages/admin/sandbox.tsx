@@ -149,7 +149,7 @@ const AdminSandbox: React.FC = () => {
   };
 
   const testRecipeSummary = async () => {
-    if (!selectedVideoId) return;
+    if (!selectedVideoId || frames.length === 0) return;
 
     setIsTestingRecipe(true);
     try {
@@ -157,7 +157,10 @@ const AdminSandbox: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipeId: selectedVideoId,
+          frames: frames.map((frame) => ({
+            timestamp: frame.timestamp,
+            description: frame.description || "No description available",
+          })),
           prompt: recipePrompt,
         }),
       });

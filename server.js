@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
-import axios from 'axios';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,18 +31,26 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
     }
 
     // Fetch the image data
-    const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-    const base64Image = Buffer.from(imageResponse.data, 'binary').toString('base64');
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
 
     // Call Ollama API for image analysis
-    const ollamaResponse = await axios.post(`${OLLAMA_API_URL}/generate`, {
-      model: "llama3.2-vision:11b",
-      prompt: prompt || "What's in this image?",
-      images: [base64Image],
-      stream: false // Ensure we get a complete response, not streamed
+    const ollamaResponse = await fetch(`${OLLAMA_API_URL}/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "llama3.2-vision:11b",
+        prompt: prompt || "What's in this image?",
+        images: [base64Image],
+        stream: false
+      })
     });
 
-    const analysis = ollamaResponse.data.response;
+    const data = await ollamaResponse.json();
+    const analysis = data.response;
     return res.json({ analysis });
   } catch (error) {
     console.error('Error in frame analysis:', error);
@@ -57,20 +64,13 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
 // Add the test-recipe-summary route
 app.post('/api/admin/test-recipe-summary', async (req, res) => {
   try {
-    const { recipeId, prompt } = req.body;
+    const { frames, prompt } = req.body;
     
-    if (!recipeId) {
-      return res.status(400).json({ error: 'Recipe ID is required' });
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      return res.status(400).json({ error: 'Frame data is required' });
     }
     
-    // Get frame descriptions from Supabase
-    const { data: frames, error } = await supabase
-      .from('video_frames')
-      .select('timestamp, description')
-      .eq('recipe_id', recipeId)
-      .order('timestamp', { ascending: true });
-      
-    if (error) throw error;
+    console.log('DEBUG: Received frames:', frames.length);
     
     // Format cooking steps from the frame descriptions
     const cookingSteps = frames
@@ -80,48 +80,89 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
     // Replace the steps placeholder in the custom prompt
     const formattedPrompt = prompt.replace('{steps}', cookingSteps);
     
-    // Call Ollama API for recipe summary
-    const ollamaResponse = await axios.post(`${OLLAMA_API_URL}/generate`, {
-      model: "llama3.2-vision:11b", // Using the same model as in ollama.ts
-      prompt: formattedPrompt,
-      system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
-      format: 'json'
-    });
-    
+    // Before making the Ollama API call
+    console.log('DEBUG: Preparing to call Ollama API');
+    console.log('DEBUG: Prompt template:', prompt);
+    console.log('DEBUG: Formatted prompt:', formattedPrompt);
+    console.log('DEBUG: Cooking steps length:', cookingSteps?.length || 0);
+
+    // Enhanced Ollama API call with proper error handling
     try {
-      // Parse the response from Ollama
-      const responseText = ollamaResponse.data.response;
-      let summary;
+      console.log('DEBUG: Calling Ollama API...');
       
+      const ollamaResponse = await fetch(`${OLLAMA_API_URL}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "llama3.2-vision:11b",
+          prompt: formattedPrompt,
+          system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
+          format: 'json'
+        })
+      });
+
+      if (!ollamaResponse.ok) {
+        throw new Error(`HTTP error! status: ${ollamaResponse.status}`);
+      }
+
+      // Get raw text first
+      const rawText = await ollamaResponse.text();
+      console.log('DEBUG: Raw API response:', rawText);
+
+      let summary;
       try {
-        // Try to parse as JSON
-        summary = JSON.parse(responseText);
-      } catch (parseError) {
-        // Fallback if not valid JSON
-        console.error('Failed to parse Ollama response as JSON:', parseError);
-        
-        // Extract title if possible
-        let title = 'Untitled Recipe';
-        if (responseText.includes('title') || responseText.includes('Title')) {
-          const titleMatch = responseText.match(/(?:title|Title)[:\s]+["']?([^"'\n]+)["']?/i);
-          if (titleMatch && titleMatch[1]) {
-            title = titleMatch[1].trim();
+        // Try to extract valid JSON from the response
+        let jsonData;
+        try {
+          // First attempt: direct parsing
+          jsonData = JSON.parse(rawText);
+        } catch (parseError) {
+          // Second attempt: try to find JSON object in the response
+          const jsonMatch = rawText.match(/(\{.*\})/s);
+          if (jsonMatch) {
+            jsonData = JSON.parse(jsonMatch[0]);
+          } else {
+            throw parseError; // Rethrow if no JSON found
           }
         }
         
-        // Create fallback summary
-        summary = {
-          title: title,
-          description: 'A delicious recipe created from cooking video. ' + 
-                      responseText.substring(0, 100).replace(/["{}\[\]]/g, '') + '...'
-        };
+        const responseText = jsonData.response;
+        
+        // Try to parse the response content as JSON
+        try {
+          summary = JSON.parse(responseText);
+        } catch {
+          // If parsing fails, create a summary from the raw text
+          const title = responseText.match(/(?:title|Title)[:\s]+["']?([^"'\n]+)["']?/i)?.[1]?.trim() || 'Untitled Recipe';
+          const description = responseText.replace(/(?:title|Title)[:\s]+["']?([^"'\n]+)["']?/i, '').trim();
+          
+          summary = {
+            title,
+            description: description || 'A delicious recipe created from cooking video.'
+          };
+        }
+      } catch (error) {
+        console.error('DEBUG: Error parsing response:', error);
+        return res.status(500).json({ 
+          error: 'Failed to parse API response',
+          details: error.message,
+          rawResponse: rawText
+        });
       }
-      
+
       return res.json({ summary });
     } catch (error) {
-      console.error('Error parsing recipe summary:', error);
+      console.error('DEBUG: Ollama API request failed:', error.message);
+      
+      if (!error.response) {
+        console.error('DEBUG: Error message:', error.message);
+      }
+      
+      console.error('DEBUG: Error stack:', error.stack);
       return res.status(500).json({ 
-        error: 'Error processing recipe summary',
+        error: 'Failed to process recipe', 
         details: error.message 
       });
     }

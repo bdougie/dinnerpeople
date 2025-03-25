@@ -153,6 +153,7 @@ class OllamaAPI {
       }
     }
 
+    console.log(`Retrieved ${descriptions.length} frame descriptions`);
     return descriptions;
   }
 
@@ -299,6 +300,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       }
     } catch (error) {
       console.error('[DEBUG] Error generating recipe summary with Ollama:', error);
+      console.log(`Formatted cooking steps: ${cookingSteps.substring(0, 100)}...`);
       return {
         title: 'Untitled Recipe',
         description: `Unable to generate a summary for this recipe due to processing limitations.`
@@ -368,7 +370,7 @@ export async function generateRecipeSummaryWithCustomPrompt(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3',
+        model: 'llama3', // Use a text-only model, not a vision model
         prompt: formattedPrompt,
         system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
         format: 'json'
