@@ -60,20 +60,32 @@ class OllamaAPI {
   /**
    * Generate a completion with the Ollama API
    */
-  private async generateCompletion(prompt: string): Promise<string> {
+  private async generateCompletion(prompt: string, imageBase64?: string): Promise<string> {
     try {
       console.log(`[DEBUG] Sending completion request to Ollama with model ${this.model}`);
+      
+      const requestBody: any = {
+        model: this.model,
+        prompt,
+        stream: false
+      };
+
+      // Add the image to the request if provided
+      if (imageBase64) {
+        // Extract the base64 data (remove data URL prefix if present)
+        const base64Data = imageBase64.includes('base64,') 
+          ? imageBase64.split('base64,')[1] 
+          : imageBase64;
+          
+        requestBody.images = [base64Data];
+      }
       
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.model,
-          prompt,
-          stream: false
-        } as OllamaRequest),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -109,8 +121,12 @@ class OllamaAPI {
       // Use the custom prompt if provided, otherwise use the default
       const prompt = customPrompt || PromptUtils.PROMPTS.FRAME_ANALYSIS;
       
-      console.log('[DEBUG] Analyzing frame with text-only prompt');
-      return await this.generateCompletion(prompt);
+      // Convert image to base64
+      console.log('[DEBUG] Converting image to base64 for analysis');
+      const imageBase64 = await this.imageUrlToBase64(imageUrl);
+      
+      console.log('[DEBUG] Analyzing frame with image data');
+      return await this.generateCompletion(prompt, imageBase64);
     } catch (error) {
       console.error('[DEBUG] Error analyzing frame with Ollama:', error);
       // Return a placeholder response if analysis fails
