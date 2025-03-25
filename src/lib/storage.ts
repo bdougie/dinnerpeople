@@ -64,11 +64,11 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
   const filePath = `${userId}/${recipeId}.mp4`;
   
   try {
-    const { data: storageData, error: storageError } = await supabase.storage
+    const { data: uploadData, error: storageError } = await supabase.storage
       .from('videos')
       .upload(filePath, file);
 
-    console.log('[DEBUG] Storage upload response:', { data: storageData, error: storageError });
+    console.log('[DEBUG] Storage upload response:', { data: uploadData, error: storageError });
     
     if (storageError) {
       console.error('[DEBUG] Storage upload error:', storageError);
@@ -104,9 +104,31 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
       }
     }
 
+    // Get the proper public URL with the full path
+    const { data: urlData } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filePath);
+
+    // Make sure the URL is complete with the file path
+    console.log('[DEBUG] Generated video URL:', urlData.publicUrl);
+
+    // Update the recipe with the correct URL
+    const { error: updateError } = await supabase
+      .from('recipes')
+      .update({ 
+        video_url: urlData.publicUrl  // This should now contain the full path
+      })
+      .eq('id', recipeId);
+
+    if (updateError) {
+      console.error('[DEBUG] Error updating recipe with video URL:', updateError);
+    } else {
+      console.log('[DEBUG] Recipe updated with video URL');
+    }
+
     // Upload successful - update processing_queue status to "processing"
     console.log('[DEBUG] Updating processing queue status to "processing"');
-    const { error: updateError } = await supabase
+    const { error: queueUpdateError } = await supabase
       .from('processing_queue')
       .update({ 
         status: 'processing',
@@ -114,8 +136,8 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
       })
       .eq('recipe_id', recipeId);
     
-    if (updateError) {
-      console.error('[DEBUG] Error updating processing status:', updateError);
+    if (queueUpdateError) {
+      console.error('[DEBUG] Error updating processing status:', queueUpdateError);
     } else {
       console.log('[DEBUG] Processing status updated to "processing"');
     }
