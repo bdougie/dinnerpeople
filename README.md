@@ -107,6 +107,7 @@ export async function uploadFrames(frames: { timestamp: number, blob: Blob }[], 
 The app uses either OpenAI in production or Ollama locally for video processing and analysis.
 
 #### AI Service Router
+_note: testing openai local? Comment out the original implementation and return false below._
 
 ```typescript
 // src/lib/ai.ts
@@ -115,11 +116,12 @@ import { openai } from './openai';
 
 class AIService {
   private isLocalEnvironment(): boolean {
-    return (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.includes('local-credentialless.webcontainer-api.io')
-    );
+    // Temporarily return false to force using OpenAI instead of Ollama
+    return true;
+    
+    // Original implementation (comment out while testing)
+    return window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1';
   }
 
   async analyzeFrame(imageUrl: string): Promise<string> {
