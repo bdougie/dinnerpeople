@@ -20,12 +20,11 @@ export default async function handler(req, res) {
     // Format cooking steps
     const cookingSteps = PromptUtils.formatCookingSteps(descriptions);
     
-    // Replace the placeholder in the prompt
-    const formattedPrompt = prompt.replace('{steps}', cookingSteps);
-    
-    // Use the AI service to generate the summary
-    // This will automatically route to Ollama or OpenAI based on environment
-    const summary = await ai.generateRecipeSummaryWithCustomPrompt(cookingSteps, formattedPrompt);
+    // Use the AI service to generate the summary with the custom prompt
+    const summary = await ai.generateRecipeSummaryWithCustomPrompt(
+      cookingSteps, 
+      prompt.replace('{steps}', cookingSteps)
+    );
     
     return res.status(200).json({ summary });
   } catch (error) {

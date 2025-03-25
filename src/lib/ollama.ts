@@ -375,13 +375,28 @@ export async function generateRecipeSummaryWithCustomPrompt(
       })
     });
     
+    // Check if the response is OK before attempting to parse as JSON
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Ollama server returned an error:', response.status, text.substring(0, 200) + '...');
+      throw new Error(`Ollama server error (${response.status}): Please check if Ollama is running on localhost:11434`);
+    }
+    
+    // Check for valid JSON content type
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Ollama server returned non-JSON response:', text.substring(0, 200) + '...');
+      throw new Error('Ollama server returned a non-JSON response');
+    }
+    
     const data = await response.json();
     return PromptUtils.parseRecipeSummaryResponse(data.response);
   } catch (error) {
     console.error('Error generating recipe summary with Ollama:', error);
     return {
       title: 'Error Generating Recipe',
-      description: 'There was an error processing this recipe with the custom prompt in Ollama.'
+      description: `There was an error processing this recipe: ${error.message}. Please ensure Ollama is running on localhost:11434.`
     };
   }
 }
