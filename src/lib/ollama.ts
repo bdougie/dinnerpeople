@@ -212,28 +212,22 @@ class OllamaAPI {
     }
 
     try {
-      // Generate embedding for the frame description
-      console.log(`[DEBUG] Generating embedding for frame at ${timestamp}s`);
+      // Generate embedding
       const embedding = await this.generateEmbedding(description);
+      let paddedEmbedding = this.padEmbedding(embedding, 1536);
       
-      // Check embedding dimensions and pad if necessary
-      let paddedEmbedding = embedding;
-      if (embedding.length !== 1536) {
-        console.log(`[DEBUG] Embedding has ${embedding.length} dimensions, padding to 1536`);
-        paddedEmbedding = this.padEmbedding(embedding, 1536);
-      }
-      
-      // Store the frame with the padded embedding
-      const { error } = await supabase.from('video_frames').insert({
+      // Fall back to direct insertion without RPC
+      const { error: insertError } = await supabase.from('video_frames').insert({
         recipe_id: recipeId,
         timestamp,
         description,
         image_url: imageUrl,
-        embedding: paddedEmbedding
+        // Store embedding as string-formatted vector - this matches PostgreSQL's expected format
+        embedding: `[${paddedEmbedding.join(',')}]` 
       });
-      
-      if (error) throw error;
-      console.log(`[DEBUG] Successfully stored frame with embedding at ${timestamp}s`);
+
+      if (insertError) throw insertError;
+      console.log(`[DEBUG] Successfully stored frame at ${timestamp}s`);
     } catch (error) {
       console.error('[DEBUG] Error storing frame with embedding:', error);
       throw error;
