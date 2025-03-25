@@ -249,6 +249,47 @@ const AdminSandbox: React.FC = () => {
         )}
       </div>
 
+      {/* Frame Selection Panel */}
+      {selectedVideoId && frames.length > 0 && (
+        <div className="mb-6 p-4 border rounded bg-gray-50">
+          <h2 className="text-xl font-semibold mb-2">Select Frame</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <select
+                value={selectedFrameId}
+                onChange={(e) => setSelectedFrameId(e.target.value)}
+                className="w-full p-2 border rounded mb-2"
+              >
+                <option value="">Select a frame</option>
+                {frames.map((frame) => (
+                  <option key={frame.id} value={frame.id}>
+                    Frame at {frame.timestamp}s (ID: {frame.id.slice(0, 8)})
+                  </option>
+                ))}
+              </select>
+              {selectedFrameId && (
+                <div className="text-sm text-gray-600">
+                  <p>Frame ID: {selectedFrameId}</p>
+                  <p>Timestamp: {getSelectedFrame()?.timestamp}s</p>
+                </div>
+              )}
+            </div>
+            <div>
+              {getSelectedFrame() && (
+                <div>
+                  <p className="text-sm font-semibold mb-2">Frame Preview:</p>
+                  <img
+                    src={getSelectedFrame()?.image_url}
+                    alt={`Frame at ${getSelectedFrame()?.timestamp}s`}
+                    className="max-w-full h-auto rounded border"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Test Panels Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         {/* Frame Analysis Panel */}
