@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Add these constants at the top of the file
-const TEXT_MODEL = 'llama3';
+const TEXT_MODEL = 'mistral';
 const IMAGE_MODEL = 'llama3.2-vision:11b';
 const EMBED_MODEL = 'nomic-embed-text';
 
@@ -29,11 +29,14 @@ const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434/api
 // API Routes
 app.post('/api/admin/test-frame-analysis', async (req, res) => {
   try {
-    const { imageUrl, prompt } = req.body;
+    const { imageUrl, prompt, model } = req.body;
     
     if (!imageUrl) {
       return res.status(400).json({ error: 'Image URL is required' });
     }
+
+    // Use provided model or fallback to default
+    const modelToUse = model || IMAGE_MODEL;
 
     // Fetch the image data
     const imageResponse = await fetch(imageUrl);
@@ -47,7 +50,7 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: TEXT_MODEL, // Use the constant instead of hardcoded value
+        model: modelToUse,
         prompt: prompt || "What's in this image?",
         images: [base64Image],
         stream: false
@@ -56,7 +59,7 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
 
     const data = await ollamaResponse.json();
     const analysis = data.response;
-    return res.json({ analysis });
+    return res.json({ analysis, modelUsed: modelToUse });
   } catch (error) {
     console.error('Error in frame analysis:', error);
     return res.status(500).json({ 
@@ -69,13 +72,17 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
 // Add the test-recipe-summary route
 app.post('/api/admin/test-recipe-summary', async (req, res) => {
   try {
-    const { frames, prompt } = req.body;
+    const { frames, prompt, model, streamResponse } = req.body;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       return res.status(400).json({ error: 'Frame data is required' });
     }
 
+    // Use provided model or fallback to default
+    const modelToUse = model || TEXT_MODEL;
+
     console.log('DEBUG: Received frames:', frames.length);
+    console.log(`DEBUG: Using model: ${modelToUse}`);
 
     // Format cooking steps from the frame descriptions
     const cookingSteps = frames
@@ -97,7 +104,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: IMAGE_MODEL, // Use the constant instead of hardcoded value
+          model: modelToUse,
           prompt: formattedPrompt,
           system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
           format: 'json'
@@ -201,7 +208,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
         });
       }
 
-      return res.json({ summary });
+      return res.json({ summary, modelUsed: modelToUse });
     } catch (error) {
       console.error('DEBUG: Ollama API request failed:', error.message);
       return res.status(500).json({
@@ -218,14 +225,17 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
   }
 });
 
-// Add the embedding endpoint
+// Update the embedding endpoint
 app.post('/api/some-embedding-endpoint', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, model } = req.body;
 
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
+
+    // Use provided model or fallback to default
+    const modelToUse = model || EMBED_MODEL;
 
     const ollamaResponse = await fetch(`${OLLAMA_API_URL}/embeddings`, {
       method: 'POST',
@@ -233,7 +243,7 @@ app.post('/api/some-embedding-endpoint', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: EMBED_MODEL, // Use the constant instead of hardcoded value
+        model: modelToUse,
         prompt: text,
       })
     });
@@ -243,12 +253,129 @@ app.post('/api/some-embedding-endpoint', async (req, res) => {
     }
 
     const embeddingData = await ollamaResponse.json();
-    return res.json({ embedding: embeddingData });
+    return res.json({ embedding: embeddingData, modelUsed: modelToUse });
   } catch (error) {
     console.error('Error in embedding endpoint:', error);
     return res.status(500).json({
       error: 'Error generating embedding',
       details: error.message
+    });
+  }
+});
+
+// Improve endpoint to fetch available Ollama models
+app.get('/api/admin/ollama-models', async (req, res) => {
+  try {
+    console.log('DEBUG: Fetching available Ollama models');
+    
+    // Create fallback models object in case of failure
+    const fallbackModels = {
+      text: [TEXT_MODEL, 'llama3', 'mistral', 'gemma'],
+      vision: [IMAGE_MODEL, 'llama3.2-vision:11b', 'llava'],
+      embedding: [EMBED_MODEL, 'nomic-embed-text'],
+      all: [TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL, 'llama3', 'mistral', 'gemma', 'llama3.2-vision:11b', 'llava'],
+      recommended: {
+        text: TEXT_MODEL,
+        vision: IMAGE_MODEL,
+        embedding: EMBED_MODEL
+      }
+    };
+    
+    try {
+      // Use a simpler fetch approach without AbortSignal.timeout which might not be supported
+      // Add a timeout with Promise.race instead
+      const fetchPromise = fetch(`${OLLAMA_API_URL}/tags`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out')), 5000)
+      );
+      
+      // Race between the fetch and the timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!response.ok) {
+        console.warn(`Ollama API returned status ${response.status}`);
+        // Return fallback models with a warning
+        return res.json({
+          ...fallbackModels,
+          warning: `Ollama API returned status ${response.status}. Using fallback model list.`
+        });
+      }
+
+      const data = await response.json();
+      
+      // Extract model names and categorize them
+      const models = data.models || [];
+      
+      if (models.length === 0) {
+        console.warn('No models returned from Ollama API');
+        return res.json({
+          ...fallbackModels,
+          warning: 'No models found in Ollama. Using fallback model list.'
+        });
+      }
+      
+      // Categorize models by type
+      const categorizedModels = {
+        text: models.filter(model => 
+          !model.name.includes('vision') && 
+          !model.name.includes('embed')).map(m => m.name),
+        vision: models.filter(model => 
+          model.name.includes('vision')).map(m => m.name),
+        embedding: models.filter(model => 
+          model.name.includes('embed')).map(m => m.name),
+        all: models.map(m => m.name),
+        // Recommend models based on currently configured ones
+        recommended: {
+          text: TEXT_MODEL,
+          vision: IMAGE_MODEL,
+          embedding: EMBED_MODEL
+        }
+      };
+      
+      // If any category is empty, add the default model to it
+      if (categorizedModels.text.length === 0) {
+        categorizedModels.text = [TEXT_MODEL];
+      }
+      
+      if (categorizedModels.vision.length === 0) {
+        categorizedModels.vision = [IMAGE_MODEL];
+      }
+      
+      if (categorizedModels.embedding.length === 0) {
+        categorizedModels.embedding = [EMBED_MODEL];
+      }
+      
+      return res.json(categorizedModels);
+    } catch (fetchError) {
+      console.error('Error fetching from Ollama:', fetchError);
+      return res.json({
+        ...fallbackModels,
+        warning: `Error connecting to Ollama: ${fetchError.message}. Using fallback model list.`
+      });
+    }
+  } catch (error) {
+    console.error('Error in ollama-models endpoint:', error);
+    
+    // Even if there's an unexpected error, return the fallback models with a 200 status
+    // to prevent client-side errors
+    return res.status(200).json({
+      text: [TEXT_MODEL, 'llama3', 'mistral', 'gemma'],
+      vision: [IMAGE_MODEL, 'llama3.2-vision:11b', 'llava'],
+      embedding: [EMBED_MODEL, 'nomic-embed-text'],
+      all: [TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL, 'llama3', 'mistral', 'gemma', 'llama3.2-vision:11b', 'llava'],
+      recommended: {
+        text: TEXT_MODEL,
+        vision: IMAGE_MODEL,
+        embedding: EMBED_MODEL
+      },
+      warning: `Server error: ${error.message}. Using fallback model list.`
     });
   }
 });

@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
-const TEXT_MODEL = 'llama3';
+const TEXT_MODEL = 'tinyllama';
 const IMAGE_MODEL = 'llama3.2-vision:11b';
 const EMBED_MODEL = 'nomic-embed-text';
 
@@ -232,18 +232,38 @@ class OllamaAPI {
     }
 
     try {
+      // Verify that the authenticated user owns the recipe
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: recipeData, error: recipeError } = await supabase
+        .from('recipes')
+        .select('user_id')
+        .eq('id', recipeId)
+        .single();
+
+      if (recipeError) {
+        console.error('[DEBUG] Error verifying recipe ownership:', recipeError);
+        throw new Error('Could not verify recipe ownership');
+      }
+
+      if (recipeData.user_id !== userData.user.id) {
+        throw new Error('Not authorized to process this recipe');
+      }
+
       // Generate embedding
       const embedding = await this.generateEmbedding(description);
       let paddedEmbedding = this.padEmbedding(embedding, 1536);
-      
-      // Fall back to direct insertion without RPC
+
+      // Insert frame after ownership verification
       const { error: insertError } = await supabase.from('video_frames').insert({
         recipe_id: recipeId,
         timestamp,
         description,
         image_url: imageUrl,
-        // Store embedding as string-formatted vector - this matches PostgreSQL's expected format
-        embedding: `[${paddedEmbedding.join(',')}]` 
+        embedding: `[${paddedEmbedding.join(',')}]` // Store embedding as string-formatted vector
       });
 
       if (insertError) throw insertError;

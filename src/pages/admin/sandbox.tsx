@@ -18,6 +18,19 @@ interface FrameInfo {
   description?: string;
 }
 
+interface OllamaModels {
+  text: string[];
+  vision: string[];
+  embedding: string[];
+  all: string[];
+  recommended: {
+    text: string;
+    vision: string;
+    embedding: string;
+  };
+  warning?: string;
+}
+
 const AdminSandbox: React.FC = () => {
   // State for videos and frames
   const [videos, setVideos] = useState<VideoInfo[]>([]);
@@ -46,9 +59,21 @@ const AdminSandbox: React.FC = () => {
   const [isFixingUrls, setIsFixingUrls] = useState(false);
   const [fixResults, setFixResults] = useState("");
 
-  // Load videos on component mount
+  // Add state for available models
+  const [availableModels, setAvailableModels] = useState<OllamaModels | null>(
+    null
+  );
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  // Add state for selected models
+  const [selectedTextModel, setSelectedTextModel] = useState("");
+  const [selectedVisionModel, setSelectedVisionModel] = useState("");
+  const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState("");
+
+  // Load videos and models on component mount
   useEffect(() => {
     fetchRecentVideos();
+    fetchAvailableModels();
   }, []);
 
   // Load frames when a video is selected
@@ -117,6 +142,74 @@ const AdminSandbox: React.FC = () => {
     }
   };
 
+  const fetchAvailableModels = async () => {
+    setIsLoadingModels(true);
+    try {
+      console.log("Fetching available Ollama models...");
+
+      // Add a timeout for the fetch call
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      try {
+        const response = await fetch("/api/admin/ollama-models", {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId); // Clear timeout on successful fetch
+
+        // If we get an error status but can still parse the response, we'll use that
+        const models = await response.json();
+
+        // If there's a warning from the server, display it
+        if (models.warning) {
+          console.warn(`Warning from Ollama models API: ${models.warning}`);
+        }
+
+        setAvailableModels(models);
+
+        // Set selected models to recommended ones
+        if (models.recommended) {
+          setSelectedTextModel(models.recommended.text);
+          setSelectedVisionModel(models.recommended.vision);
+          setSelectedEmbeddingModel(models.recommended.embedding);
+        }
+      } catch (fetchError) {
+        console.error("Error fetching Ollama models:", fetchError);
+        throw fetchError; // Re-throw to handle in the outer catch block
+      }
+    } catch (error) {
+      console.error("Failed to get available models:", error);
+
+      // Set fallback models
+      const fallbackModels = {
+        text: ["tinyllama", "llama3", "mistral"],
+        vision: ["llama3.2-vision:11b"],
+        embedding: ["nomic-embed-text"],
+        all: [
+          "tinyllama",
+          "llama3",
+          "mistral",
+          "llama3.2-vision:11b",
+          "nomic-embed-text",
+        ],
+        recommended: {
+          text: "tinyllama",
+          vision: "llama3.2-vision:11b",
+          embedding: "nomic-embed-text",
+        },
+        warning: "Could not connect to model API. Using fallback models.",
+      };
+
+      setAvailableModels(fallbackModels);
+      setSelectedTextModel(fallbackModels.recommended.text);
+      setSelectedVisionModel(fallbackModels.recommended.vision);
+      setSelectedEmbeddingModel(fallbackModels.recommended.embedding);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
   const getSelectedFrame = () => {
     return frames.find((frame) => frame.id === selectedFrameId);
   };
@@ -137,6 +230,7 @@ const AdminSandbox: React.FC = () => {
         body: JSON.stringify({
           imageUrl: selectedFrame.image_url,
           prompt: framePrompt,
+          model: selectedVisionModel, // Use selected vision model
         }),
       });
 
@@ -165,7 +259,7 @@ const AdminSandbox: React.FC = () => {
           })),
           prompt: recipePrompt,
           streamResponse: true, // Add option to request streaming response
-          model: "llama3", // Specify the model to use
+          model: selectedTextModel, // Use selected text model
         }),
       });
 
@@ -506,6 +600,97 @@ const AdminSandbox: React.FC = () => {
     );
   }
 
+  const ModelSelector = () => {
+    if (isLoadingModels) {
+      return <div className="text-center p-4">Loading available models...</div>;
+    }
+
+    if (!availableModels) {
+      return (
+        <div className="text-center p-4 text-yellow-600">
+          Unable to load Ollama models. Using default models instead.
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {availableModels.warning && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded text-sm">
+            Warning: {availableModels.warning}
+          </div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <h3 className="font-semibold mb-2">Text Model</h3>
+            <select
+              value={selectedTextModel}
+              onChange={(e) => setSelectedTextModel(e.target.value)}
+              className="w-full p-2 border rounded"
+            >
+              {availableModels.text.length > 0 ? (
+                availableModels.text.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))
+              ) : (
+                <option value="">No text models available</option>
+              )}
+            </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Used for recipe summaries and text generation
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-2">Vision Model</h3>
+            <select
+              value={selectedVisionModel}
+              onChange={(e) => setSelectedVisionModel(e.target.value)}
+              className="w-full p-2 border rounded"
+            >
+              {availableModels.vision.length > 0 ? (
+                availableModels.vision.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))
+              ) : (
+                <option value="">No vision models available</option>
+              )}
+            </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Used for frame analysis and image processing
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-2">Embedding Model</h3>
+            <select
+              value={selectedEmbeddingModel}
+              onChange={(e) => setSelectedEmbeddingModel(e.target.value)}
+              className="w-full p-2 border rounded"
+            >
+              {availableModels.embedding.length > 0 ? (
+                availableModels.embedding.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))
+              ) : (
+                <option value="">No embedding models available</option>
+              )}
+            </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Used for semantic search functionality
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">AI Prompt Testing Sandbox</h1>
@@ -521,6 +706,12 @@ const AdminSandbox: React.FC = () => {
             Refresh Videos
           </button>
           <button
+            onClick={fetchAvailableModels}
+            className="px-3 py-1 bg-green-500 text-white rounded"
+          >
+            Refresh Models
+          </button>
+          <button
             onClick={fixStreamingIssue}
             disabled={isFixingUrls}
             className="px-3 py-1 bg-yellow-500 text-white rounded disabled:bg-gray-400"
@@ -533,6 +724,12 @@ const AdminSandbox: React.FC = () => {
             <pre className="text-xs">{fixResults}</pre>
           </div>
         )}
+      </div>
+
+      {/* Model Selection Panel */}
+      <div className="mb-6 p-4 border rounded bg-gray-50">
+        <h2 className="text-xl font-semibold mb-2">Ollama Model Selection</h2>
+        <ModelSelector />
       </div>
 
       {/* Video Selection Panel */}
