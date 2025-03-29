@@ -164,14 +164,55 @@ const AdminSandbox: React.FC = () => {
             description: frame.description || "No description available",
           })),
           prompt: recipePrompt,
+          streamResponse: true, // Add option to request streaming response
+          model: "llama3", // Specify the model to use
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Server responded with ${response.status}: ${errorText}`
+        );
+      }
 
       const result = await response.json();
       setRecipeResult(JSON.stringify(result.summary, null, 2));
     } catch (error) {
       console.error("Error testing recipe summary:", error);
-      setRecipeResult(`Error: ${error.message}`);
+
+      // Improve error display with better error extraction
+      let errorMessage = error.message || "Unknown error";
+
+      // Extract structured error data if available
+      try {
+        if (errorMessage.includes("{") && errorMessage.includes("}")) {
+          const match = errorMessage.match(/\{.*\}/s);
+          if (match) {
+            const errorObj = JSON.parse(match[0]);
+            errorMessage = `Error: ${errorObj.error || errorMessage}\n\n${
+              errorObj.details || ""
+            }`;
+
+            // Add a hint about streaming responses if relevant
+            if (
+              errorObj.details?.includes("Unexpected non-whitespace character")
+            ) {
+              errorMessage +=
+                "\n\nHint: The server may be failing to handle streaming responses. Try:\n" +
+                "1. Using the 'llama3' model instead of other models\n" +
+                "2. Implementing a streaming response handler on the server side\n" +
+                "3. Setting response headers correctly for streaming";
+            }
+          }
+        }
+      } catch (parseError) {
+        // Silently continue if we can't parse the error details
+      }
+
+      setRecipeResult(
+        `${errorMessage}\n\nCheck server logs for full response.`
+      );
     } finally {
       setIsTestingRecipe(false);
     }
@@ -199,6 +240,29 @@ const AdminSandbox: React.FC = () => {
       setSocialResult(`Error: ${error.message}`);
     } finally {
       setIsTestingSocial(false);
+    }
+  };
+
+  // Add a fix for streaming response handling issues
+  const fixStreamingIssue = async () => {
+    setIsFixingUrls(true);
+    setFixResults("Working on it...");
+    try {
+      const response = await fetch("/api/admin/fix-streaming-issue", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      const result = await response.json();
+      setFixResults(JSON.stringify(result, null, 2));
+    } catch (error) {
+      console.error("Error fixing streaming issue:", error);
+      setFixResults(`Error: ${error.message}`);
+    } finally {
+      setIsFixingUrls(false);
     }
   };
 
@@ -445,6 +509,31 @@ const AdminSandbox: React.FC = () => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">AI Prompt Testing Sandbox</h1>
+
+      {/* Admin Tools Panel */}
+      <div className="mb-6 p-4 border rounded bg-gray-50">
+        <h2 className="text-xl font-semibold mb-2">Admin Tools</h2>
+        <div className="flex gap-4">
+          <button
+            onClick={fetchRecentVideos}
+            className="px-3 py-1 bg-blue-500 text-white rounded"
+          >
+            Refresh Videos
+          </button>
+          <button
+            onClick={fixStreamingIssue}
+            disabled={isFixingUrls}
+            className="px-3 py-1 bg-yellow-500 text-white rounded disabled:bg-gray-400"
+          >
+            {isFixingUrls ? "Working..." : "Fix Streaming Response Issues"}
+          </button>
+        </div>
+        {fixResults && (
+          <div className="mt-4 p-3 bg-gray-100 rounded overflow-auto max-h-48">
+            <pre className="text-xs">{fixResults}</pre>
+          </div>
+        )}
+      </div>
 
       {/* Video Selection Panel */}
       <div className="mb-6 p-4 border rounded bg-gray-50">
