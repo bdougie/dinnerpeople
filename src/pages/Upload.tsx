@@ -266,11 +266,12 @@ export default function Upload() {
       console.log("[DEBUG] Starting thumbnail generation");
       const thumbnailUrl = await generateThumbnail(file);
       console.log("[DEBUG] Thumbnail generated successfully");
+
       setPreview({ file, thumbnailUrl });
 
       console.log("[DEBUG] Starting video upload to Supabase");
       setIsUploading(true);
-      const result = await uploadVideo(file);
+      const result = await uploadVideo(file, thumbnailUrl); // Pass the thumbnail to the upload function
       console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);

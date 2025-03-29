@@ -6,7 +6,7 @@ export interface UploadResult {
   processingStatus: string;
 }
 
-export async function uploadVideo(file: File): Promise<UploadResult> {
+export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<UploadResult> {
   console.log('[DEBUG] uploadVideo started with file:', file.name, file.size);
   
   const userResponse = await supabase.auth.getUser();
@@ -22,7 +22,7 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
   const recipeId = uuidv4();
   console.log('[DEBUG] Generated recipeId:', recipeId);
 
-  // Create recipe entry with a temporary title
+  // Create recipe entry with a temporary title and thumbnail if provided
   console.log('[DEBUG] Creating recipe entry in database');
   const { data: recipeData, error: recipeError } = await supabase
     .from('recipes')
@@ -31,7 +31,8 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
       user_id: userId,
       status: 'draft',
       title: `Untitled Recipe ${new Date().toLocaleDateString()}`, // Temporary title
-      description: 'Recipe details will be added after processing'
+      description: 'Recipe details will be added after processing',
+      thumbnail_url: thumbnailUrl || null, // Save the thumbnail URL if provided
     })
     .select();
 
@@ -140,6 +141,48 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
       console.error('[DEBUG] Error updating processing status:', queueUpdateError);
     } else {
       console.log('[DEBUG] Processing status updated to "processing"');
+    }
+
+    // If we have a data URL for the thumbnail, save it to storage
+    if (thumbnailUrl && thumbnailUrl.startsWith('data:')) {
+      try {
+        console.log('[DEBUG] Saving thumbnail to storage');
+        // Convert data URL to blob
+        const response = await fetch(thumbnailUrl);
+        const blob = await response.blob();
+        
+        // Upload the thumbnail
+        const thumbnailPath = `${userId}/${recipeId}.jpg`;
+        const { data: thumbData, error: thumbError } = await supabase.storage
+          .from('thumbnails')
+          .upload(thumbnailPath, blob);
+          
+        if (thumbError) {
+          console.error('[DEBUG] Error uploading thumbnail:', thumbError);
+        } else {
+          // Get the public URL
+          const { data: urlData } = supabase.storage
+            .from('thumbnails')
+            .getPublicUrl(thumbnailPath);
+            
+          // Update the recipe with the thumbnail URL
+          const { error: updateThumbError } = await supabase
+            .from('recipes')
+            .update({ 
+              thumbnail_url: urlData.publicUrl 
+            })
+            .eq('id', recipeId);
+            
+          if (updateThumbError) {
+            console.error('[DEBUG] Error updating recipe with thumbnail URL:', updateThumbError);
+          } else {
+            console.log('[DEBUG] Recipe updated with thumbnail URL:', urlData.publicUrl);
+          }
+        }
+      } catch (thumbErr) {
+        console.error('[DEBUG] Error processing thumbnail:', thumbErr);
+        // Don't fail the whole upload if just the thumbnail processing fails
+      }
     }
 
     return { 
