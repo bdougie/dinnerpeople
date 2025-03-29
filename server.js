@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
-import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './src/lib/constants.js';
+import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './src/lib/serverConstants.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
