@@ -31,7 +31,7 @@ export const PROMPTS = {
   RECIPE_SUMMARY: 
     `Based on the following video frame descriptions, create a concise recipe title and detailed description.
     The title should be appealing, descriptive, and under 60 characters.
-    The description should be 2-3 sentences summarizing the dish, key ingredients, and cooking methods seen in the video.
+    The description should be 1 sentences summarizing the dish, key ingredients, and cooking methods seen in the video.
     
     Video frame descriptions:
     {steps}

@@ -1,10 +1,8 @@
 import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
+import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './constants';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
-const TEXT_MODEL = 'tinyllama';
-const IMAGE_MODEL = 'llama3.2-vision:11b';
-const EMBED_MODEL = 'nomic-embed-text';
 
 interface OllamaResponse {
   model: string;
