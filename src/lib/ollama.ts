@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
+import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './constants';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -21,7 +22,7 @@ class OllamaAPI {
   private baseUrl: string;
   private model: string;
 
-  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama3') {
+  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = IMAGE_MODEL) {
     this.baseUrl = baseUrl;
     this.model = model;
   }
@@ -60,20 +61,32 @@ class OllamaAPI {
   /**
    * Generate a completion with the Ollama API
    */
-  private async generateCompletion(prompt: string): Promise<string> {
+  private async generateCompletion(prompt: string, imageBase64?: string): Promise<string> {
     try {
       console.log(`[DEBUG] Sending completion request to Ollama with model ${this.model}`);
+      
+      const requestBody: any = {
+        model: this.model,
+        prompt,
+        stream: false
+      };
+
+      // Add the image to the request if provided
+      if (imageBase64) {
+        // Extract the base64 data (remove data URL prefix if present)
+        const base64Data = imageBase64.includes('base64,') 
+          ? imageBase64.split('base64,')[1] 
+          : imageBase64;
+          
+        requestBody.images = [base64Data];
+      }
       
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: this.model,
-          prompt,
-          stream: false
-        } as OllamaRequest),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -109,8 +122,12 @@ class OllamaAPI {
       // Use the custom prompt if provided, otherwise use the default
       const prompt = customPrompt || PromptUtils.PROMPTS.FRAME_ANALYSIS;
       
-      console.log('[DEBUG] Analyzing frame with text-only prompt');
-      return await this.generateCompletion(prompt);
+      // Convert image to base64
+      console.log('[DEBUG] Converting image to base64 for analysis');
+      const imageBase64 = await this.imageUrlToBase64(imageUrl);
+      
+      console.log('[DEBUG] Analyzing frame with image data');
+      return await this.generateCompletion(prompt, imageBase64);
     } catch (error) {
       console.error('[DEBUG] Error analyzing frame with Ollama:', error);
       // Return a placeholder response if analysis fails
@@ -153,6 +170,7 @@ class OllamaAPI {
       }
     }
 
+    console.log(`Retrieved ${descriptions.length} frame descriptions`);
     return descriptions;
   }
 
@@ -165,7 +183,7 @@ class OllamaAPI {
     }
 
     try {
-      console.log('[DEBUG] Generating embedding with nomic-embed-text');
+      console.log(`[DEBUG] Generating embedding with ${EMBED_MODEL}`);
       
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -173,7 +191,7 @@ class OllamaAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'nomic-embed-text',
+          model: EMBED_MODEL,
           prompt: text,
         }),
       });
@@ -183,8 +201,8 @@ class OllamaAPI {
         console.error(`[DEBUG] Ollama embedding error: ${errText}`);
         
         if (errText.includes("model") && errText.includes("not found")) {
-          console.error(`[DEBUG] Model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
-          throw new Error(`Ollama model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
+          console.error(`[DEBUG] Model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
+          throw new Error(`Ollama model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
         }
         
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
@@ -212,18 +230,38 @@ class OllamaAPI {
     }
 
     try {
+      // Verify that the authenticated user owns the recipe
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: recipeData, error: recipeError } = await supabase
+        .from('recipes')
+        .select('user_id')
+        .eq('id', recipeId)
+        .single();
+
+      if (recipeError) {
+        console.error('[DEBUG] Error verifying recipe ownership:', recipeError);
+        throw new Error('Could not verify recipe ownership');
+      }
+
+      if (recipeData.user_id !== userData.user.id) {
+        throw new Error('Not authorized to process this recipe');
+      }
+
       // Generate embedding
       const embedding = await this.generateEmbedding(description);
       let paddedEmbedding = this.padEmbedding(embedding, 1536);
-      
-      // Fall back to direct insertion without RPC
+
+      // Insert frame after ownership verification
       const { error: insertError } = await supabase.from('video_frames').insert({
         recipe_id: recipeId,
         timestamp,
         description,
         image_url: imageUrl,
-        // Store embedding as string-formatted vector - this matches PostgreSQL's expected format
-        embedding: `[${paddedEmbedding.join(',')}]` 
+        embedding: `[${paddedEmbedding.join(',')}]` // Store embedding as string-formatted vector
       });
 
       if (insertError) throw insertError;
@@ -299,6 +337,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       }
     } catch (error) {
       console.error('[DEBUG] Error generating recipe summary with Ollama:', error);
+      console.log(`Formatted cooking steps: ${cookingSteps.substring(0, 100)}...`);
       return {
         title: 'Untitled Recipe',
         description: `Unable to generate a summary for this recipe due to processing limitations.`
@@ -307,85 +346,109 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
   }
 
   /**
-   * Complete recipe summarization with Ollama
+   * Update recipe with AI-generated title and description
    */
   async updateRecipeWithSummary(recipeId: string): Promise<void> {
-    try {
-      // Get existing recipe data to ensure we're not losing information
-      const { data: existingRecipe, error: fetchError } = await supabase
-        .from('recipes')
-        .select('*')
-        .eq('id', recipeId)
-        .single();
-        
-      if (fetchError) throw fetchError;
-      
-      // Generate the recipe summary
-      const summary = await this.generateRecipeSummary(
-        existingRecipe.cooking_steps || ''
-      );
-      
-      // Update only fields we know exist in the schema
-      const { error: updateError } = await supabase
-        .from('recipes')
-        .update({
-          title: summary.title,
-          description: summary.description,
-          // Remove reference to ai_generated column
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', recipeId);
-        
-      if (updateError) throw updateError;
-      
-      console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
-    } catch (error) {
-      console.error('[DEBUG] Error updating recipe with summary:', error);
-      throw error;
-    }
+    return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
   }
-}
 
-/**
- * Generate a recipe summary with a custom prompt for local testing
- */
-export async function generateRecipeSummaryWithCustomPrompt(
-  cookingSteps: string,
-  customPrompt: string
-): Promise<PromptUtils.RecipeSummary> {
-  try {
-    if (!window.location.hostname.includes('localhost') && 
-        !window.location.hostname.includes('127.0.0.1') &&
-        !window.location.hostname.includes('local-credentialless.webcontainer-api.io')) {
+  /**
+   * Generate a recipe summary with a custom prompt for local testing
+   */
+  async generateRecipeSummaryWithCustomPrompt(
+    cookingSteps: string,
+    customPrompt: string
+  ): Promise<PromptUtils.RecipeSummary> {
+    if (!this.isLocalEnvironment()) {
       throw new Error('Ollama can only be used in local development environment');
     }
-    
-    // Replace the steps placeholder in the custom prompt
-    const formattedPrompt = customPrompt.replace('{steps}', cookingSteps);
-    
-    // Use Ollama locally to generate a summary with the custom prompt
-    const response = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama3',
-        prompt: formattedPrompt,
-        system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
-        format: 'json'
-      })
-    });
-    
-    const data = await response.json();
-    return PromptUtils.parseRecipeSummaryResponse(data.response);
-  } catch (error) {
-    console.error('Error generating recipe summary with Ollama:', error);
-    return {
-      title: 'Error Generating Recipe',
-      description: 'There was an error processing this recipe with the custom prompt in Ollama.'
-    };
+
+    try {
+      // Replace the steps placeholder in the custom prompt
+      const formattedPrompt = customPrompt.replace('{steps}', cookingSteps);
+
+      const response = await fetch(`${this.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: TEXT_MODEL, // Use the text model constant here
+          prompt: formattedPrompt,
+          system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
+          format: 'json'
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Ollama server returned an error:', response.status, text.substring(0, 200) + '...');
+        throw new Error(`Ollama server error (${response.status}): Please check if Ollama is running on localhost:11434`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Ollama server returned non-JSON response:', text.substring(0, 200) + '...');
+        throw new Error('Ollama server returned a non-JSON response');
+      }
+
+      const data = await response.json();
+      return PromptUtils.parseRecipeSummaryResponse(data.response);
+    } catch (error) {
+      console.error('Error generating recipe summary with Ollama:', error);
+      return {
+        title: 'Error Generating Recipe',
+        description: `There was an error processing this recipe: ${error.message}. Please ensure Ollama is running on localhost:11434.`
+      };
+    }
+  }
+
+  /**
+   * Detect social media handles in an image with a custom prompt for sandbox testing
+   */
+  async detectSocialHandlesWithCustomPrompt(
+    imageUrl: string,
+    customPrompt?: string
+  ): Promise<{ rawResponse: string; socialHandles: string[] }> {
+    if (!this.isLocalEnvironment()) {
+      throw new Error('Ollama can only be used in local development environment');
+    }
+
+    try {
+      // Use the provided custom prompt or fall back to the default social media detection prompt
+      const prompt = customPrompt || PromptUtils.PROMPTS.SOCIAL_MEDIA_DETECTION;
+      
+      // Convert image to base64
+      console.log('[DEBUG] Converting image to base64 for social media detection');
+      const imageBase64 = await this.imageUrlToBase64(imageUrl);
+      
+      console.log('[DEBUG] Analyzing image for social media handles');
+      const response = await this.generateCompletion(prompt, imageBase64);
+      
+      // Extract social handles
+      const socialHandles: string[] = [];
+      if (response.includes('SOCIAL:') && !response.includes('SOCIAL:none')) {
+        const handleMatch = response.match(/SOCIAL:([^:]+):(.+)/);
+        if (handleMatch && handleMatch.length >= 3) {
+          const platform = handleMatch[1].trim();
+          const username = handleMatch[2].trim();
+          socialHandles.push(`${platform}:${username}`);
+        }
+      }
+      
+      return {
+        rawResponse: response,
+        socialHandles
+      };
+    } catch (error) {
+      console.error('Error detecting social media handles with Ollama:', error);
+      return {
+        rawResponse: `Error: ${error.message}`,
+        socialHandles: []
+      };
+    }
   }
 }
 
 // Create and export a singleton instance
-// Use regular llama3 model which is more widely available
-export const ollama = new OllamaAPI('http://localhost:11434', 'llama3.2-vision:11b');
+// Use the image model constant
+export const ollama = new OllamaAPI('http://localhost:11434', IMAGE_MODEL);

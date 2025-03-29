@@ -183,43 +183,12 @@ export async function generateRecipeSummaryWithCustomPrompt(
  * Update recipe with AI-generated title and description
  */
 export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
-  try {
-    // Get existing recipe data
-    const { data: existingRecipe, error: fetchError } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('id', recipeId)
-      .single();
-      
-    if (fetchError) throw fetchError;
-    
-    // Generate the recipe summary
-    const summary = await generateRecipeSummary(
-      existingRecipe.cooking_steps || ''
-    );
-    
-    // Format any attribution data using the correct function
-    const attributionData = formatAttribution(
-      existingRecipe.temp_handle || '', 
-      existingRecipe.temp_video_url || ''
-    );
-    
-    // Update only fields we know exist in the schema
-    const { error: updateError } = await supabase
-      .from('recipes')
-      .update({
-        title: summary.title,
-        description: summary.description,
-        attribution: attributionData, // Use the properly formatted attribution JSONB
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', recipeId);
-      
-    if (updateError) throw updateError;
-    
-    console.log(`[DEBUG] Updated recipe ${recipeId} with AI-generated summary`);
-  } catch (error) {
-    console.error('[DEBUG] Error updating recipe with summary:', error);
-    throw error;
-  }
+  return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
+}
+
+/**
+ * Generate recipe summary without updating the database (for previews)
+ */
+export async function summarize(recipeId: string): Promise<PromptUtils.RecipeSummary> {
+  return PromptUtils.summarize(recipeId, generateRecipeSummary);
 }
