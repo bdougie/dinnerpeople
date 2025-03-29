@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { supabase } from './supabase';
+import { supabase, formatAttribution } from './supabase';
 import * as PromptUtils from './prompt-utils';
 
 const openai = new OpenAI({
@@ -7,10 +7,13 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
+// Update model name from gpt-4-vision-preview to gpt-4o-mini
+const MODEL = 'gpt-4o-mini';
+
 export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: MODEL,
       messages: [
         {
           role: "user",
@@ -21,7 +24,9 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
             },
             {
               type: "image_url",
-              image_url: imageUrl
+              image_url: {
+                url: imageUrl
+              }
             }
           ]
         }
