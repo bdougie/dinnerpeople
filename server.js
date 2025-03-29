@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Add these constants at the top of the file
+const TEXT_MODEL = 'llama3';
+const IMAGE_MODEL = 'llama3.2-vision:11b';
+const EMBED_MODEL = 'nomic-embed-text';
+
 // Middleware
 app.use(express.json());
 app.use(cors({
@@ -42,7 +47,7 @@ app.post('/api/admin/test-frame-analysis', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "llama3",
+        model: TEXT_MODEL, // Use the constant instead of hardcoded value
         prompt: prompt || "What's in this image?",
         images: [base64Image],
         stream: false
@@ -92,7 +97,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "llama3.2-vision:11b",
+          model: IMAGE_MODEL, // Use the constant instead of hardcoded value
           prompt: formattedPrompt,
           system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
           format: 'json'
@@ -208,6 +213,41 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
     console.error('Error in test-recipe-summary:', error);
     return res.status(500).json({
       error: 'Error generating recipe summary',
+      details: error.message
+    });
+  }
+});
+
+// Add the embedding endpoint
+app.post('/api/some-embedding-endpoint', async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    const ollamaResponse = await fetch(`${OLLAMA_API_URL}/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: EMBED_MODEL, // Use the constant instead of hardcoded value
+        prompt: text,
+      })
+    });
+
+    if (!ollamaResponse.ok) {
+      throw new Error(`HTTP error! status: ${ollamaResponse.status}`);
+    }
+
+    const embeddingData = await ollamaResponse.json();
+    return res.json({ embedding: embeddingData });
+  } catch (error) {
+    console.error('Error in embedding endpoint:', error);
+    return res.status(500).json({
+      error: 'Error generating embedding',
       details: error.message
     });
   }

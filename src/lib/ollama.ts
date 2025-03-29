@@ -2,6 +2,9 @@ import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
+const TEXT_MODEL = 'llama3';
+const IMAGE_MODEL = 'llama3.2-vision:11b';
+const EMBED_MODEL = 'nomic-embed-text';
 
 interface OllamaResponse {
   model: string;
@@ -21,7 +24,7 @@ class OllamaAPI {
   private baseUrl: string;
   private model: string;
 
-  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = 'llama3.2-vision:11b') {
+  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = IMAGE_MODEL) {
     this.baseUrl = baseUrl;
     this.model = model;
   }
@@ -182,7 +185,7 @@ class OllamaAPI {
     }
 
     try {
-      console.log('[DEBUG] Generating embedding with nomic-embed-text');
+      console.log(`[DEBUG] Generating embedding with ${EMBED_MODEL}`);
       
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -190,7 +193,7 @@ class OllamaAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'nomic-embed-text',
+          model: EMBED_MODEL,
           prompt: text,
         }),
       });
@@ -200,8 +203,8 @@ class OllamaAPI {
         console.error(`[DEBUG] Ollama embedding error: ${errText}`);
         
         if (errText.includes("model") && errText.includes("not found")) {
-          console.error(`[DEBUG] Model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
-          throw new Error(`Ollama model 'nomic-embed-text' not found. Please run: ollama pull nomic-embed-text`);
+          console.error(`[DEBUG] Model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
+          throw new Error(`Ollama model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
         }
         
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
@@ -330,63 +333,58 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
   async updateRecipeWithSummary(recipeId: string): Promise<void> {
     return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
   }
-}
 
-/**
- * Generate a recipe summary with a custom prompt for local testing
- */
-export async function generateRecipeSummaryWithCustomPrompt(
-  cookingSteps: string,
-  customPrompt: string
-): Promise<PromptUtils.RecipeSummary> {
-  try {
-    if (!window.location.hostname.includes('localhost') && 
-        !window.location.hostname.includes('127.0.0.1') &&
-        !window.location.hostname.includes('local-credentialless.webcontainer-api.io')) {
+  /**
+   * Generate a recipe summary with a custom prompt for local testing
+   */
+  async generateRecipeSummaryWithCustomPrompt(
+    cookingSteps: string,
+    customPrompt: string
+  ): Promise<PromptUtils.RecipeSummary> {
+    if (!this.isLocalEnvironment()) {
       throw new Error('Ollama can only be used in local development environment');
     }
-    
-    // Replace the steps placeholder in the custom prompt
-    const formattedPrompt = customPrompt.replace('{steps}', cookingSteps);
-    
-    // Use Ollama locally to generate a summary with the custom prompt
-    const response = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama3', // Use a text-only model, not a vision model
-        prompt: formattedPrompt,
-        system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
-        format: 'json'
-      })
-    });
-    
-    // Check if the response is OK before attempting to parse as JSON
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('Ollama server returned an error:', response.status, text.substring(0, 200) + '...');
-      throw new Error(`Ollama server error (${response.status}): Please check if Ollama is running on localhost:11434`);
+
+    try {
+      // Replace the steps placeholder in the custom prompt
+      const formattedPrompt = customPrompt.replace('{steps}', cookingSteps);
+
+      const response = await fetch(`${this.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: TEXT_MODEL, // Use the text model constant here
+          prompt: formattedPrompt,
+          system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
+          format: 'json'
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Ollama server returned an error:', response.status, text.substring(0, 200) + '...');
+        throw new Error(`Ollama server error (${response.status}): Please check if Ollama is running on localhost:11434`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Ollama server returned non-JSON response:', text.substring(0, 200) + '...');
+        throw new Error('Ollama server returned a non-JSON response');
+      }
+
+      const data = await response.json();
+      return PromptUtils.parseRecipeSummaryResponse(data.response);
+    } catch (error) {
+      console.error('Error generating recipe summary with Ollama:', error);
+      return {
+        title: 'Error Generating Recipe',
+        description: `There was an error processing this recipe: ${error.message}. Please ensure Ollama is running on localhost:11434.`
+      };
     }
-    
-    // Check for valid JSON content type
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('Ollama server returned non-JSON response:', text.substring(0, 200) + '...');
-      throw new Error('Ollama server returned a non-JSON response');
-    }
-    
-    const data = await response.json();
-    return PromptUtils.parseRecipeSummaryResponse(data.response);
-  } catch (error) {
-    console.error('Error generating recipe summary with Ollama:', error);
-    return {
-      title: 'Error Generating Recipe',
-      description: `There was an error processing this recipe: ${error.message}. Please ensure Ollama is running on localhost:11434.`
-    };
   }
 }
 
 // Create and export a singleton instance
-// Use regular llama3 model which is more widely available
-export const ollama = new OllamaAPI('http://localhost:11434', 'llama3.2-vision:11b');
+// Use the image model constant
+export const ollama = new OllamaAPI('http://localhost:11434', IMAGE_MODEL);
