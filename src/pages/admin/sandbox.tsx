@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { PROMPTS } from "../../lib/prompt-utils";
 import { generateEmbedding } from "../../lib/openai";
 import { initializeSearchFunctions } from "../../lib/search";
+import { ollama } from "../../lib/ollama";
 
 interface VideoInfo {
   id: string;
@@ -69,6 +70,17 @@ const AdminSandbox: React.FC = () => {
   const [selectedTextModel, setSelectedTextModel] = useState("");
   const [selectedVisionModel, setSelectedVisionModel] = useState("");
   const [selectedEmbeddingModel, setSelectedEmbeddingModel] = useState("");
+
+  // Add state for social media detection sandbox
+  const [imageUrl, setImageUrl] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [socialDetectionResult, setSocialDetectionResult] = useState<{
+    rawResponse: string;
+    socialHandles: string[];
+  } | null>(null);
+  const [socialDetectionError, setSocialDetectionError] = useState<
+    string | null
+  >(null);
 
   // Load videos and models on component mount
   useEffect(() => {
@@ -324,8 +336,16 @@ const AdminSandbox: React.FC = () => {
         body: JSON.stringify({
           imageUrl: selectedFrame.image_url,
           prompt: socialPrompt,
+          model: selectedVisionModel, // Use selected vision model
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Server responded with ${response.status}: ${errorText}`
+        );
+      }
 
       const result = await response.json();
       setSocialResult(result.socialHandles || "No social handles detected");
@@ -334,6 +354,23 @@ const AdminSandbox: React.FC = () => {
       setSocialResult(`Error: ${error.message}`);
     } finally {
       setIsTestingSocial(false);
+    }
+  };
+
+  const handleDetectSocialHandles = async () => {
+    setSocialDetectionError(null);
+    setSocialDetectionResult(null);
+
+    try {
+      const detectionResult = await ollama.detectSocialHandlesWithCustomPrompt(
+        imageUrl,
+        customPrompt
+      );
+      setSocialDetectionResult(detectionResult);
+    } catch (err: any) {
+      setSocialDetectionError(
+        err.message || "An error occurred while detecting social handles."
+      );
     }
   };
 
@@ -894,6 +931,54 @@ const AdminSandbox: React.FC = () => {
             {socialResult || "Run test to see results"}
           </div>
         </div>
+      </div>
+
+      {/* Social Media Detection Sandbox */}
+      <div className="mt-6 p-6 border rounded-lg bg-white shadow-sm">
+        <h1 className="text-2xl font-bold">Social Media Detection Sandbox</h1>
+        <div>
+          <label className="block text-sm font-medium">Image URL</label>
+          <input
+            type="text"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded"
+            placeholder="Enter image URL"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium">
+            Custom Prompt (Optional)
+          </label>
+          <textarea
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded"
+            placeholder="Enter a custom prompt or leave blank for default"
+          />
+        </div>
+        <button
+          onClick={handleDetectSocialHandles}
+          className="px-4 py-2 bg-blue-500 text-white rounded"
+        >
+          Detect Social Handles
+        </button>
+        {socialDetectionError && (
+          <p className="text-red-500">{socialDetectionError}</p>
+        )}
+        {socialDetectionResult && (
+          <div className="mt-4">
+            <h2 className="text-lg font-bold">Detection Result</h2>
+            <p>
+              <strong>Raw Response:</strong> {socialDetectionResult.rawResponse}
+            </p>
+            <p>
+              <strong>Social Handles:</strong>{" "}
+              {socialDetectionResult.socialHandles.join(", ") ||
+                "None detected"}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6">

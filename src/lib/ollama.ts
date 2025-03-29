@@ -401,6 +401,52 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       };
     }
   }
+
+  /**
+   * Detect social media handles in an image with a custom prompt for sandbox testing
+   */
+  async detectSocialHandlesWithCustomPrompt(
+    imageUrl: string,
+    customPrompt?: string
+  ): Promise<{ rawResponse: string; socialHandles: string[] }> {
+    if (!this.isLocalEnvironment()) {
+      throw new Error('Ollama can only be used in local development environment');
+    }
+
+    try {
+      // Use the provided custom prompt or fall back to the default social media detection prompt
+      const prompt = customPrompt || PromptUtils.PROMPTS.SOCIAL_MEDIA_DETECTION;
+      
+      // Convert image to base64
+      console.log('[DEBUG] Converting image to base64 for social media detection');
+      const imageBase64 = await this.imageUrlToBase64(imageUrl);
+      
+      console.log('[DEBUG] Analyzing image for social media handles');
+      const response = await this.generateCompletion(prompt, imageBase64);
+      
+      // Extract social handles
+      const socialHandles: string[] = [];
+      if (response.includes('SOCIAL:') && !response.includes('SOCIAL:none')) {
+        const handleMatch = response.match(/SOCIAL:([^:]+):(.+)/);
+        if (handleMatch && handleMatch.length >= 3) {
+          const platform = handleMatch[1].trim();
+          const username = handleMatch[2].trim();
+          socialHandles.push(`${platform}:${username}`);
+        }
+      }
+      
+      return {
+        rawResponse: response,
+        socialHandles
+      };
+    } catch (error) {
+      console.error('Error detecting social media handles with Ollama:', error);
+      return {
+        rawResponse: `Error: ${error.message}`,
+        socialHandles: []
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

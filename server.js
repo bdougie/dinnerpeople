@@ -225,6 +225,67 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
   }
 });
 
+// Add the social media detection route
+app.post('/api/admin/test-social-detection', async (req, res) => {
+  try {
+    const { imageUrl, prompt, model } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Image URL is required' });
+    }
+
+    // Use provided model or fallback to default vision model
+    const modelToUse = model || IMAGE_MODEL;
+
+    // Fetch the image data
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
+
+    // Call Ollama API for social media detection with specialized prompt
+    const defaultPrompt = "Examine this image and identify any social media handles, usernames, or profiles that are shown. If you find any, respond with SOCIAL:platform:username. For example, if you see an Instagram handle, respond with SOCIAL:instagram:username. If no social media identifiers are present, respond with SOCIAL:none.";
+    
+    const ollamaResponse = await fetch(`${OLLAMA_API_URL}/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: modelToUse,
+        prompt: prompt || defaultPrompt,
+        images: [base64Image],
+        stream: false
+      })
+    });
+
+    const data = await ollamaResponse.json();
+    const analysis = data.response;
+    
+    // Extract social handles if present
+    let socialHandles = 'No social handles detected';
+    if (analysis.includes('SOCIAL:') && !analysis.includes('SOCIAL:none')) {
+      const handleMatch = analysis.match(/SOCIAL:([^:]+):(.+)/);
+      if (handleMatch && handleMatch.length >= 3) {
+        const platform = handleMatch[1].trim();
+        const username = handleMatch[2].trim();
+        socialHandles = `${platform}:${username}`;
+      }
+    }
+    
+    return res.json({ 
+      analysis, 
+      socialHandles, 
+      modelUsed: modelToUse 
+    });
+  } catch (error) {
+    console.error('Error in social media detection:', error);
+    return res.status(500).json({ 
+      error: 'Error analyzing for social media',
+      details: error.message 
+    });
+  }
+});
+
 // Update the embedding endpoint
 app.post('/api/some-embedding-endpoint', async (req, res) => {
   try {
