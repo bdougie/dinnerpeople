@@ -2,14 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
+import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './src/lib/constants.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Add these constants at the top of the file
-const TEXT_MODEL = 'mistral';
-const IMAGE_MODEL = 'llama3.2-vision:11b';
-const EMBED_MODEL = 'nomic-embed-text';
 
 // Middleware
 app.use(express.json());
@@ -78,7 +74,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
       return res.status(400).json({ error: 'Frame data is required' });
     }
 
-    // Use provided model or fallback to default
+    // Use provided model or fallback to default TEXT_MODEL
     const modelToUse = model || TEXT_MODEL;
 
     console.log('DEBUG: Received frames:', frames.length);
@@ -106,7 +102,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
         body: JSON.stringify({
           model: modelToUse,
           prompt: formattedPrompt,
-          system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
+          system: 'You are a culinary expert. IMPORTANT: Your response MUST be valid JSON with a "title" and "description" field. Example: {"title": "Recipe Name", "description": "Recipe description"}',
           format: 'json'
         })
       });
@@ -117,7 +113,8 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
 
       // Get raw text first
       const rawText = await ollamaResponse.text();
-      console.log('DEBUG: Raw API response:', rawText);
+      console.log('DEBUG: Raw API response (first 500 chars):', rawText.substring(0, 500));
+      console.log('DEBUG: Response content type:', typeof rawText);
 
       let summary;
       try {
@@ -155,6 +152,7 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
 
         // Now handle the response data - which could be JSON or text
         if (jsonData.response) {
+          console.log('DEBUG: Using jsonData.response path');
           const responseText = jsonData.response;
 
           // Try to extract JSON from the response text
@@ -190,9 +188,11 @@ app.post('/api/admin/test-recipe-summary', async (req, res) => {
             };
           }
         } else if (jsonData.title) {
+          console.log('DEBUG: Using jsonData.title path');
           // The outer JSON object might already be the summary
           summary = jsonData;
         } else {
+          console.log('DEBUG: Using last resort fallback path');
           // Last resort fallback
           summary = {
             title: 'Untitled Recipe',
