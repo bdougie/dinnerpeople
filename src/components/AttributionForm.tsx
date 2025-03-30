@@ -6,13 +6,30 @@ interface AttributionFormProps {
   onSubmit: () => void;
 }
 
+// Helper function to extract handle from URL
+function extractHandleFromUrl(url: string): string {
+  try {
+    // Remove trailing slash if present
+    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+    // Get the last part of the URL path
+    const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
+    const handle = parts[parts.length - 1];
+    return handle ? `@${handle}` : url;
+  } catch (e) {
+    // If URL parsing fails, return the original string
+    return url;
+  }
+}
+
 export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [authorName, setAuthorName] = useState("");
   const [originalUrl, setOriginalUrl] = useState("");
-  const [socialHandles, setSocialHandles] = useState<string[]>([]);
+  const [socialUrl, setSocialUrl] = useState("");
   const [socialHandleInput, setSocialHandleInput] = useState("");
   const [platform, setPlatform] = useState("instagram");
+  const [socialHandles, setSocialHandles] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchRecipeData() {
@@ -20,16 +37,42 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
       try {
         const { data, error } = await supabase
           .from("recipes")
-          .select("attribution_name, attribution_url, social_handles")
+          .select(
+            "attribution, attribution_name, attribution_url, social_handles"
+          )
           .eq("id", recipeId)
           .single();
 
         if (error) throw error;
 
         if (data) {
+          // Set legacy attribution fields
           setAuthorName(data.attribution_name || "");
-          setOriginalUrl(data.attribution_url || "");
           setSocialHandles(data.social_handles || []);
+
+          // Parse the new attribution JSON field if it exists
+          if (data.attribution) {
+            try {
+              // Try to parse as JSON
+              const attributionObj =
+                typeof data.attribution === "string"
+                  ? JSON.parse(data.attribution)
+                  : data.attribution; // Handle if it's already an object
+
+              // Set state with values from the attribution field
+              setSocialUrl(attributionObj.handle || "");
+              setOriginalUrl(
+                attributionObj.original_url || data.attribution_url || ""
+              );
+            } catch (e) {
+              console.error("Failed to parse attribution JSON:", e);
+              // If parsing fails, fall back to legacy fields
+              setOriginalUrl(data.attribution_url || "");
+            }
+          } else {
+            // If no attribution JSON, use legacy fields
+            setOriginalUrl(data.attribution_url || "");
+          }
         }
       } catch (error) {
         console.error("Error fetching recipe data:", error);
@@ -43,12 +86,42 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    // Validate URLs
+    const urlPattern =
+      /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;
+
+    if (socialUrl && !urlPattern.test(socialUrl)) {
+      setError(
+        "Please enter a valid social media URL (e.g., https://www.instagram.com/username/)"
+      );
+      return;
+    }
+
+    if (originalUrl && !urlPattern.test(originalUrl)) {
+      setError("Please enter a valid content URL");
+      return;
+    }
 
     try {
+      // Format attribution as JSON object matching the structure used in other components
+      const formattedAttribution = {
+        handle: socialUrl.trim(),
+        original_url: originalUrl.trim(),
+      };
+
+      // Create a string version for the attribution field
+      const attributionString =
+        socialUrl.trim() || originalUrl.trim()
+          ? JSON.stringify(formattedAttribution)
+          : "";
+
       const { error } = await supabase
         .from("recipes")
         .update({
-          attribution_name: authorName,
+          attribution: attributionString,
+          attribution_name: authorName, // Keep updating legacy fields for backward compatibility
           attribution_url: originalUrl,
           social_handles: socialHandles,
           updated_at: new Date().toISOString(),
@@ -58,8 +131,9 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
       if (error) throw error;
 
       onSubmit();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating attribution:", error);
+      setError(error.message);
     }
   };
 
@@ -100,6 +174,12 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div>
         <label className="block mb-1">Author/Creator Name</label>
         <input
@@ -112,18 +192,35 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
       </div>
 
       <div>
-        <label className="block mb-1">Original Content URL</label>
+        <label htmlFor="socialUrl" className="block mb-1">
+          Social Media URL
+        </label>
         <input
           type="url"
-          value={originalUrl}
-          onChange={(e) => setOriginalUrl(e.target.value)}
+          id="socialUrl"
+          value={socialUrl}
+          onChange={(e) => setSocialUrl(e.target.value)}
           className="w-full px-3 py-2 border rounded"
-          placeholder="https://..."
+          placeholder="https://www.instagram.com/username/"
         />
       </div>
 
       <div>
-        <label className="block mb-1">Social Media Handles</label>
+        <label htmlFor="originalUrl" className="block mb-1">
+          Original Content URL
+        </label>
+        <input
+          type="url"
+          id="originalUrl"
+          value={originalUrl}
+          onChange={(e) => setOriginalUrl(e.target.value)}
+          className="w-full px-3 py-2 border rounded"
+          placeholder="https://www.example.com/original-video"
+        />
+      </div>
+
+      <div>
+        <label className="block mb-1">Additional Social Media Handles</label>
         <div className="flex mb-2">
           <select
             value={platform}
@@ -157,7 +254,9 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
               {socialHandles.map((handle) => renderSocialHandleBadge(handle))}
             </div>
           ) : (
-            <p className="text-gray-500 italic">No social handles added yet.</p>
+            <p className="text-gray-500 italic">
+              No additional social handles added yet.
+            </p>
           )}
         </div>
       </div>

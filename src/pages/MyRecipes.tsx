@@ -63,9 +63,10 @@ export default function MyRecipes() {
     if (recipe.attribution) {
       try {
         const attributionObj = JSON.parse(recipe.attribution);
-        social = attributionObj.handle || "";
-        videoUrl = attributionObj.original_url || "";
+        social = attributionObj?.handle || "";
+        videoUrl = attributionObj?.original_url || "";
       } catch (e) {
+        console.error("Error parsing attribution:", e);
         social = "";
         videoUrl = "";
       }
@@ -226,6 +227,7 @@ export default function MyRecipes() {
             instructions: recipe.instructions || "",
             userId: recipe.user_id,
             createdAt: recipe.created_at,
+            attribution: recipe.attribution || "",
             status: "processed",
           }))
         );
@@ -254,6 +256,7 @@ export default function MyRecipes() {
             instructions: item.recipes.instructions || "",
             userId: item.recipes.user_id,
             createdAt: item.recipes.created_at,
+            attribution: item.recipes.attribution || "",
             status: "processed",
           }));
 
