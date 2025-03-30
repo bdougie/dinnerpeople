@@ -8,6 +8,7 @@ import { Recipe } from "../types";
 // Interface for recipe data with additional status field
 interface RecipeWithStatus extends Recipe {
   status?: string;
+  attribution?: string;
 }
 
 // Default fallback image for recipes without thumbnails
@@ -21,15 +22,82 @@ export default function MyRecipes() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedInstructions, setEditedInstructions] = useState("");
   const [activeTab, setActiveTab] = useState<RecipeTab>("uploaded");
+  // Add new state for attribution editing modal
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editedDetails, setEditedDetails] = useState({
+    title: "",
+    description: "",
+    attribution: "",
+  });
 
   // Add state for recipes and loading
   const [recipes, setRecipes] = useState<RecipeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Add dropdown state
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleEdit = (recipe: RecipeWithStatus) => {
     setEditedInstructions(recipe.instructions || "");
     setIsEditing(true);
+  };
+
+  // Add new handler for editing details
+  const handleEditDetails = (recipe: RecipeWithStatus) => {
+    setEditedDetails({
+      title: recipe.title || "",
+      description: recipe.description || "",
+      attribution: recipe.attribution || "",
+    });
+    setIsEditingDetails(true);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!selectedUpload) return;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from("recipes")
+        .update({
+          title: editedDetails.title,
+          description: editedDetails.description,
+          attribution: editedDetails.attribution,
+        })
+        .eq("id", selectedUpload.id);
+
+      if (error) throw error;
+
+      // Update the local state
+      setRecipes((prev) =>
+        prev.map((recipe) =>
+          recipe.id === selectedUpload.id
+            ? {
+                ...recipe,
+                title: editedDetails.title,
+                description: editedDetails.description,
+                attribution: editedDetails.attribution,
+              }
+            : recipe
+        )
+      );
+
+      setSelectedUpload((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: editedDetails.title,
+              description: editedDetails.description,
+              attribution: editedDetails.attribution,
+            }
+          : null
+      );
+      setIsEditingDetails(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -293,12 +361,57 @@ export default function MyRecipes() {
             </div>
 
             <div className="p-6">
-              <h2 className="text-2xl tracking-wider uppercase text-black dark:text-white">
-                {selectedUpload.title}
-              </h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl tracking-wider uppercase text-black dark:text-white">
+                  {selectedUpload.title}
+                </h2>
+
+                {/* Add ellipsis menu here */}
+                {activeTab === "uploaded" && (
+                  <div className="relative">
+                    <button
+                      className="p-2 text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsDropdownOpen(!isDropdownOpen);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        fill="currentColor"
+                        viewBox="0 0 16 16"
+                      >
+                        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
+                      </svg>
+                    </button>
+
+                    {isDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 shadow-lg rounded-md z-10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsDropdownOpen(false);
+                            handleEditDetails(selectedUpload);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-300"
+                        >
+                          Edit details
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-sm tracking-wider text-gray-500 dark:text-gray-400">
                 {selectedUpload.description}
               </p>
+              {selectedUpload.attribution && (
+                <p className="mt-1 text-xs italic text-gray-500 dark:text-gray-400">
+                  Attribution: {selectedUpload.attribution}
+                </p>
+              )}
 
               <div className="mt-8 space-y-8">
                 <div>
