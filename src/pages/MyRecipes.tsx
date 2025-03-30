@@ -28,6 +28,8 @@ export default function MyRecipes() {
     title: "",
     description: "",
     attribution: "",
+    social: "", // Add social handle field
+    videoUrl: "", // Add original video URL field
   });
 
   // Add state for recipes and loading
@@ -42,18 +44,50 @@ export default function MyRecipes() {
     setIsEditing(true);
   };
 
-  // Add new handler for editing details
+  // Update handler for editing details
   const handleEditDetails = (recipe: RecipeWithStatus) => {
+    // Extract attribution details if they exist
+    let social = "";
+    let videoUrl = "";
+
+    // Parse attribution if it exists
+    if (recipe.attribution) {
+      try {
+        // Try to parse as JSON if it's structured
+        const attributionObj = JSON.parse(recipe.attribution);
+        social = attributionObj.handle || "";
+        videoUrl = attributionObj.original_url || "";
+      } catch (e) {
+        // If parsing fails, just use as string
+        social = "";
+        videoUrl = "";
+      }
+    }
+
     setEditedDetails({
       title: recipe.title || "",
       description: recipe.description || "",
       attribution: recipe.attribution || "",
+      social,
+      videoUrl,
     });
     setIsEditingDetails(true);
   };
 
   const handleSaveDetails = async () => {
     if (!selectedUpload) return;
+
+    // Format attribution as an object with social and video URL
+    const formattedAttribution = {
+      handle: editedDetails.social.trim(),
+      original_url: editedDetails.videoUrl.trim(),
+    };
+
+    // Create a string version for the attribution field
+    const attributionString =
+      editedDetails.social.trim() || editedDetails.videoUrl.trim()
+        ? JSON.stringify(formattedAttribution)
+        : "";
 
     setIsLoading(true);
     try {
@@ -62,7 +96,7 @@ export default function MyRecipes() {
         .update({
           title: editedDetails.title,
           description: editedDetails.description,
-          attribution: editedDetails.attribution,
+          attribution: attributionString,
         })
         .eq("id", selectedUpload.id);
 
@@ -76,7 +110,7 @@ export default function MyRecipes() {
                 ...recipe,
                 title: editedDetails.title,
                 description: editedDetails.description,
-                attribution: editedDetails.attribution,
+                attribution: attributionString,
               }
             : recipe
         )
@@ -88,7 +122,7 @@ export default function MyRecipes() {
               ...prev,
               title: editedDetails.title,
               description: editedDetails.description,
-              attribution: editedDetails.attribution,
+              attribution: attributionString,
             }
           : null
       );
@@ -486,6 +520,118 @@ export default function MyRecipes() {
                 )}
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Separate AnimatePresence for modal */}
+      <AnimatePresence>
+        {isEditingDetails && selectedUpload && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-dark-100 border border-gray-200 dark:border-dark-200 p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg tracking-wider uppercase text-black dark:text-white mb-4">
+                Edit Recipe Details
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="title"
+                    className="block text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    id="title"
+                    value={editedDetails.title}
+                    onChange={(e) =>
+                      setEditedDetails({
+                        ...editedDetails,
+                        title: e.target.value,
+                      })
+                    }
+                    className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="description"
+                    className="block text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id="description"
+                    value={editedDetails.description}
+                    onChange={(e) =>
+                      setEditedDetails({
+                        ...editedDetails,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400 mb-2">
+                    Attribution (Optional)
+                  </h3>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="@username"
+                      className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                      value={editedDetails.social}
+                      onChange={(e) =>
+                        setEditedDetails({
+                          ...editedDetails,
+                          social: e.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      type="url"
+                      placeholder="Original video URL"
+                      className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                      value={editedDetails.videoUrl}
+                      onChange={(e) =>
+                        setEditedDetails({
+                          ...editedDetails,
+                          videoUrl: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-4 mt-6">
+                  <button
+                    onClick={() => setIsEditingDetails(false)}
+                    className="btn-secondary dark:border-white dark:text-white dark:hover:border-gray-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveDetails}
+                    className="btn-primary dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
