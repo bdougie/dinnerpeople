@@ -234,7 +234,30 @@ export async function extractSocialHandles(
 }
 
 /**
- * Process social handles and update the recipe
+ * Format a social media handle into a proper URL
+ */
+function formatSocialMediaUrl(platform: string, username: string): string {
+  const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
+
+  switch (platform.toLowerCase()) {
+    case 'instagram':
+      return `https://www.instagram.com/${cleanUsername}/`;
+    case 'tiktok':
+      return `https://www.tiktok.com/@${cleanUsername}`;
+    case 'youtube':
+      return `https://www.youtube.com/${cleanUsername}`;
+    case 'twitter':
+    case 'x':
+      return `https://twitter.com/${cleanUsername}`;
+    case 'facebook':
+      return `https://www.facebook.com/${cleanUsername}`;
+    default:
+      return `${platform}:${cleanUsername}`;
+  }
+}
+
+/**
+ * Process social handles and update the recipe with proper URLs
  */
 export async function processSocialHandles(
   recipeId: string,
@@ -242,10 +265,8 @@ export async function processSocialHandles(
 ): Promise<string[]> {
   try {
     const socialHandles = await extractSocialHandles(recipeId, analyzeFrameFn);
-    
-    // Only update the recipe if social handles were actually found
+
     if (socialHandles && socialHandles.length > 0) {
-      // Store social handles in a separate table instead of as a column
       for (const handle of socialHandles) {
         const [platform, username] = handle.split(':');
         const { error } = await supabase
@@ -253,17 +274,36 @@ export async function processSocialHandles(
           .insert({
             recipe_id: recipeId,
             platform,
-            username
+            username,
           });
-          
+
         if (error) console.error('Error storing social handle:', error);
       }
-      
+
+      // Format the first handle as a proper URL and update the recipe attribution
+      const [platform, username] = socialHandles[0].split(':');
+      const formattedUrl = formatSocialMediaUrl(platform, username);
+
+      const attribution = {
+        handle: formattedUrl,
+        original_url: "", // Preserve existing structure
+      };
+
+      const { error: updateError } = await supabase
+        .from('recipes')
+        .update({
+          attribution: JSON.stringify(attribution),
+        })
+        .eq('id', recipeId);
+
+      if (updateError) console.error('Error updating recipe attribution:', updateError);
+
       console.log('[DEBUG] Stored recipe social handles:', socialHandles);
+      console.log('[DEBUG] Updated recipe attribution with formatted URL:', formattedUrl);
     } else {
       console.log('[DEBUG] No social handles found, skipping database update');
     }
-    
+
     return socialHandles;
   } catch (error) {
     console.error('Error processing social handles:', error);

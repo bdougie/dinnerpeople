@@ -19,6 +19,18 @@ import {
 import { ai } from "../lib/ai";
 import { processSocialHandles } from "../lib/prompt-utils";
 
+// Include this helper function at the top of your file
+function extractHandleFromUrl(url: string): string {
+  try {
+    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+    const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
+    const handle = parts[parts.length - 1];
+    return handle ? `@${handle}` : url;
+  } catch (e) {
+    return url;
+  }
+}
+
 interface UploadPreview {
   file: File;
   thumbnailUrl: string;
@@ -266,11 +278,12 @@ export default function Upload() {
       console.log("[DEBUG] Starting thumbnail generation");
       const thumbnailUrl = await generateThumbnail(file);
       console.log("[DEBUG] Thumbnail generated successfully");
+
       setPreview({ file, thumbnailUrl });
 
       console.log("[DEBUG] Starting video upload to Supabase");
       setIsUploading(true);
-      const result = await uploadVideo(file);
+      const result = await uploadVideo(file, thumbnailUrl); // Pass the thumbnail to the upload function
       console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
@@ -556,11 +569,31 @@ export default function Upload() {
   const handleSave = async () => {
     if (!recipeId) return;
 
-    try {
-      const formattedAttribution = formatAttribution(
-        attribution.handle,
-        attribution.original_url
+    // Validate URLs
+    const socialUrl = attribution.handle.trim();
+    const videoUrl = attribution.original_url.trim();
+
+    // Basic URL validation
+    const urlPattern =
+      /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;
+
+    if (socialUrl && !urlPattern.test(socialUrl)) {
+      setError(
+        "Please enter a valid social media URL (e.g., https://www.instagram.com/username/)"
       );
+      return;
+    }
+
+    if (videoUrl && !urlPattern.test(videoUrl)) {
+      setError("Please enter a valid video URL");
+      return;
+    }
+
+    try {
+      const formattedAttribution = {
+        handle: socialUrl,
+        original_url: videoUrl,
+      };
 
       const { error: updateError } = await supabase
         .from("recipes")
@@ -745,30 +778,48 @@ export default function Upload() {
                     Attribution (Optional)
                   </h3>
                   <div className="space-y-4">
-                    <input
-                      type="text"
-                      placeholder="@username"
-                      className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
-                      value={attribution.handle}
-                      onChange={(e) =>
-                        setAttribution((prev) => ({
-                          ...prev,
-                          handle: e.target.value,
-                        }))
-                      }
-                    />
-                    <input
-                      type="url"
-                      placeholder="Original video URL"
-                      className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
-                      value={attribution.original_url}
-                      onChange={(e) =>
-                        setAttribution((prev) => ({
-                          ...prev,
-                          original_url: e.target.value,
-                        }))
-                      }
-                    />
+                    <div>
+                      <label
+                        htmlFor="social"
+                        className="block text-sm text-gray-500 dark:text-gray-400 mb-1"
+                      >
+                        Social Media URL
+                      </label>
+                      <input
+                        type="url"
+                        id="social"
+                        placeholder="https://www.instagram.com/username/"
+                        className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
+                        value={attribution.handle}
+                        onChange={(e) =>
+                          setAttribution((prev) => ({
+                            ...prev,
+                            handle: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="videoUrl"
+                        className="block text-sm text-gray-500 dark:text-gray-400 mb-1"
+                      >
+                        Original Video URL
+                      </label>
+                      <input
+                        type="url"
+                        id="videoUrl"
+                        placeholder="https://www.example.com/original-video"
+                        className="w-full px-4 py-2 text-sm border border-gray-200 dark:border-dark-300 bg-white dark:bg-dark-200 text-black dark:text-white focus:border-black dark:focus:border-white focus:ring-0"
+                        value={attribution.original_url}
+                        onChange={(e) =>
+                          setAttribution((prev) => ({
+                            ...prev,
+                            original_url: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
