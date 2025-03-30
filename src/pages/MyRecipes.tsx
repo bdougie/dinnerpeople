@@ -5,6 +5,21 @@ import { RecipeTab } from "../types";
 import { supabase } from "../lib/supabase";
 import { Recipe } from "../types";
 
+// Helper function to extract handle from URL
+function extractHandleFromUrl(url: string): string {
+  try {
+    // Remove trailing slash if present
+    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+    // Get the last part of the URL path
+    const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
+    const handle = parts[parts.length - 1];
+    return handle ? `@${handle}` : url;
+  } catch (e) {
+    // If URL parsing fails, return the original string
+    return url;
+  }
+}
+
 // Interface for recipe data with additional status field
 interface RecipeWithStatus extends Recipe {
   status?: string;
@@ -22,21 +37,18 @@ export default function MyRecipes() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedInstructions, setEditedInstructions] = useState("");
   const [activeTab, setActiveTab] = useState<RecipeTab>("uploaded");
-  // Add new state for attribution editing modal
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [editedDetails, setEditedDetails] = useState({
     title: "",
     description: "",
     attribution: "",
-    social: "", // Add social handle field
-    videoUrl: "", // Add original video URL field
+    social: "",
+    videoUrl: "",
   });
 
-  // Add state for recipes and loading
   const [recipes, setRecipes] = useState<RecipeWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Add dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const handleEdit = (recipe: RecipeWithStatus) => {
@@ -44,21 +56,16 @@ export default function MyRecipes() {
     setIsEditing(true);
   };
 
-  // Update handler for editing details
   const handleEditDetails = (recipe: RecipeWithStatus) => {
-    // Extract attribution details if they exist
     let social = "";
     let videoUrl = "";
 
-    // Parse attribution if it exists
     if (recipe.attribution) {
       try {
-        // Try to parse as JSON if it's structured
         const attributionObj = JSON.parse(recipe.attribution);
         social = attributionObj.handle || "";
         videoUrl = attributionObj.original_url || "";
       } catch (e) {
-        // If parsing fails, just use as string
         social = "";
         videoUrl = "";
       }
@@ -77,17 +84,31 @@ export default function MyRecipes() {
   const handleSaveDetails = async () => {
     if (!selectedUpload) return;
 
-    // Format attribution as an object with social and video URL
+    let socialUrl = editedDetails.social.trim();
+    let videoUrl = editedDetails.videoUrl.trim();
+
+    const urlPattern =
+      /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;
+
+    if (socialUrl && !urlPattern.test(socialUrl)) {
+      setError(
+        "Please enter a valid social media URL (e.g., https://www.instagram.com/username/)"
+      );
+      return;
+    }
+
+    if (videoUrl && !urlPattern.test(videoUrl)) {
+      setError("Please enter a valid video URL");
+      return;
+    }
+
     const formattedAttribution = {
-      handle: editedDetails.social.trim(),
-      original_url: editedDetails.videoUrl.trim(),
+      handle: socialUrl,
+      original_url: videoUrl,
     };
 
-    // Create a string version for the attribution field
     const attributionString =
-      editedDetails.social.trim() || editedDetails.videoUrl.trim()
-        ? JSON.stringify(formattedAttribution)
-        : "";
+      socialUrl || videoUrl ? JSON.stringify(formattedAttribution) : "";
 
     setIsLoading(true);
     try {
@@ -102,7 +123,6 @@ export default function MyRecipes() {
 
       if (error) throw error;
 
-      // Update the local state
       setRecipes((prev) =>
         prev.map((recipe) =>
           recipe.id === selectedUpload.id
@@ -146,7 +166,6 @@ export default function MyRecipes() {
 
       if (error) throw error;
 
-      // Update the local state
       setRecipes((prev) =>
         prev.map((recipe) =>
           recipe.id === selectedUpload.id
@@ -172,7 +191,6 @@ export default function MyRecipes() {
     { id: "saved", label: "Saved" },
   ];
 
-  // Fetch recipes when tab changes
   useEffect(() => {
     fetchRecipes();
   }, [activeTab]);
@@ -190,10 +208,7 @@ export default function MyRecipes() {
         throw new Error("User not authenticated");
       }
 
-      let query;
-
       if (activeTab === "uploaded") {
-        // Get recipes created by user
         const { data, error } = await supabase
           .from("recipes")
           .select("*")
@@ -211,12 +226,10 @@ export default function MyRecipes() {
             instructions: recipe.instructions || "",
             userId: recipe.user_id,
             createdAt: recipe.created_at,
-            // Consider all recipes processed for now
             status: "processed",
           }))
         );
       } else if (activeTab === "liked" || activeTab === "saved") {
-        // Get recipes liked or saved by user
         const { data, error } = await supabase
           .from("recipe_interactions")
           .select(
@@ -231,7 +244,7 @@ export default function MyRecipes() {
         if (error) throw error;
 
         const formattedRecipes = data
-          .filter((item) => item.recipes) // Filter out any null items
+          .filter((item) => item.recipes)
           .map((item) => ({
             id: item.recipes.id,
             title: item.recipes.title || "Untitled Recipe",
@@ -400,7 +413,6 @@ export default function MyRecipes() {
                   {selectedUpload.title}
                 </h2>
 
-                {/* Add ellipsis menu here */}
                 {activeTab === "uploaded" && (
                   <div className="relative">
                     <button
@@ -442,9 +454,46 @@ export default function MyRecipes() {
                 {selectedUpload.description}
               </p>
               {selectedUpload.attribution && (
-                <p className="mt-1 text-xs italic text-gray-500 dark:text-gray-400">
-                  Attribution: {selectedUpload.attribution}
-                </p>
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="italic">Attribution:</p>
+                  {(() => {
+                    try {
+                      const attr = JSON.parse(selectedUpload.attribution);
+                      return (
+                        <div className="mt-1 space-y-1">
+                          {attr.handle && (
+                            <p>
+                              Social:{" "}
+                              <a
+                                href={attr.handle}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                {extractHandleFromUrl(attr.handle)}
+                              </a>
+                            </p>
+                          )}
+                          {attr.original_url && (
+                            <p>
+                              Source:{" "}
+                              <a
+                                href={attr.original_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                {new URL(attr.original_url).hostname}
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    } catch (e) {
+                      return selectedUpload.attribution;
+                    }
+                  })()}
+                </div>
               )}
 
               <div className="mt-8 space-y-8">
@@ -524,7 +573,6 @@ export default function MyRecipes() {
         )}
       </AnimatePresence>
 
-      {/* Separate AnimatePresence for modal */}
       <AnimatePresence>
         {isEditingDetails && selectedUpload && (
           <motion.div
@@ -589,30 +637,48 @@ export default function MyRecipes() {
                     Attribution (Optional)
                   </h3>
                   <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="@username"
-                      className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
-                      value={editedDetails.social}
-                      onChange={(e) =>
-                        setEditedDetails({
-                          ...editedDetails,
-                          social: e.target.value,
-                        })
-                      }
-                    />
-                    <input
-                      type="url"
-                      placeholder="Original video URL"
-                      className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
-                      value={editedDetails.videoUrl}
-                      onChange={(e) =>
-                        setEditedDetails({
-                          ...editedDetails,
-                          videoUrl: e.target.value,
-                        })
-                      }
-                    />
+                    <div>
+                      <label
+                        htmlFor="social"
+                        className="block text-sm text-gray-500 dark:text-gray-400 mb-1"
+                      >
+                        Social Media URL
+                      </label>
+                      <input
+                        type="url"
+                        id="social"
+                        placeholder="https://www.instagram.com/username/"
+                        className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                        value={editedDetails.social}
+                        onChange={(e) =>
+                          setEditedDetails({
+                            ...editedDetails,
+                            social: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="videoUrl"
+                        className="block text-sm text-gray-500 dark:text-gray-400 mb-1"
+                      >
+                        Original Video URL
+                      </label>
+                      <input
+                        type="url"
+                        id="videoUrl"
+                        placeholder="https://www.example.com/original-video"
+                        className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                        value={editedDetails.videoUrl}
+                        onChange={(e) =>
+                          setEditedDetails({
+                            ...editedDetails,
+                            videoUrl: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-4 mt-6">
