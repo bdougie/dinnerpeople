@@ -1,24 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Production configuration
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Determine Supabase URL and anon key based on environment
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 // Create Supabase client
-export const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-  {
-    db: {
-      schema: 'public',
-    },
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Format attribution data for Supabase JSONB storage
