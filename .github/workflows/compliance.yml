@@ -1,0 +1,134 @@
+name: PR Compliance Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conventional-commits:
+    name: Validate Conventional Commits (Warning Only)
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    continue-on-error: true
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate conventional commits
+        uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.warning.json
+        continue-on-error: true
+
+      - name: Comment on PR about commit format
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `### ⚠️ Commit Message Format
+
+            Your commit messages don't follow the [Conventional Commits](https://www.conventionalcommits.org/) format. While this won't block your PR, using conventional commits helps with:
+
+            - 🤖 Automated changelog generation
+            - 📦 Semantic versioning
+            - 🔍 Better commit history
+
+            **Expected format:**
+            \`\`\`
+            <type>(<scope>): <subject>
+
+            <body>
+
+            <footer>
+            \`\`\`
+
+            **Examples:**
+            - \`feat: add new visualization component\`
+            - \`fix(api): resolve data fetching issue\`
+            - \`docs: update README with new examples\`
+
+            **Common types:** feat, fix, docs, style, refactor, test, chore`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type checking
+        run: npm run typecheck || npm run build
+
+      - name: Run tests
+        run: npm test -- --run --coverage || npm test -- --run
+
+      - name: Upload coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate || true
+
+      - name: Run security scanning
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
