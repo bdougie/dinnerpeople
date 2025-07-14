@@ -53,7 +53,7 @@ const AdminSandbox: React.FC = () => {
 
   // Loading states
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
-  const [isLoadingFrames, setIsLoadingFrames] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [isLoadingFrames, setIsLoadingFrames] = useState(false);
   const [isTestingFrame, setIsTestingFrame] = useState(false);
   const [isTestingRecipe, setIsTestingRecipe] = useState(false);
   const [isTestingSocial, setIsTestingSocial] = useState(false);
@@ -119,8 +119,9 @@ const AdminSandbox: React.FC = () => {
       setVideos(videos);
 
       // Auto-select the first video if available
-      if (videos.length > 0 && !selectedVideoId) {
-        setSelectedVideoId(videos[0].id);
+      const firstVideo = videos[0];
+      if (firstVideo && !selectedVideoId) {
+        setSelectedVideoId(firstVideo.id);
       }
     } catch (error) {
       console.error("Error fetching recent videos:", error);
@@ -144,8 +145,9 @@ const AdminSandbox: React.FC = () => {
       setFrames(data || []);
 
       // Auto-select the first frame if available
-      if (data && data.length > 0) {
-        setSelectedFrameId(data[0].id);
+      const firstFrame = data?.[0];
+      if (firstFrame) {
+        setSelectedFrameId(firstFrame.id);
       }
     } catch (error) {
       console.error("Error fetching frames:", error);
@@ -851,9 +853,10 @@ const AdminSandbox: React.FC = () => {
       </div>
 
       {/* Frame Selection Panel */}
-      {selectedVideoId && frames.length > 0 && (
+      {selectedVideoId && (isLoadingFrames || frames.length > 0) && (
         <div className="mb-6 p-4 border rounded bg-gray-50">
           <h2 className="text-xl font-semibold mb-2">Select Frame</h2>
+          {isLoadingFrames && <p className="text-gray-500">Loading frames...</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <select

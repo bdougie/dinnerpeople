@@ -57,6 +57,10 @@ export function useFoodQuote(): Quote {
   // and not on every re-render
   return useMemo(() => {
     const randomIndex = Math.floor(Math.random() * foodQuotes.length);
-    return foodQuotes[randomIndex];
+    const quote = foodQuotes[randomIndex];
+    if (!quote) {
+      return foodQuotes[0]!;
+    }
+    return quote;
   }, []);
 }

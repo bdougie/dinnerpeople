@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { ChefHat, Upload, Home, LogOut, Settings, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
