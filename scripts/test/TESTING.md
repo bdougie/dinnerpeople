@@ -18,7 +18,13 @@ This guide explains how to test each component of the video upload workflow in i
    - FFmpeg installed (`brew install ffmpeg` on macOS)
    - All npm packages installed (`npm install`)
 
-3. **Test Media**
+3. **Test Environment Setup**
+   ```bash
+   node scripts/test/setup-test-env.js
+   ```
+   This creates the `/upload-test` directory structure for temporary files.
+
+4. **Test Media**
    - A sample video file (MP4 format recommended)
    - Or use a publicly accessible image URL for AI analysis tests
 
@@ -28,8 +34,12 @@ This guide explains how to test each component of the video upload workflow in i
 Tests uploading videos to Supabase Storage.
 
 ```bash
+# From project root:
+node scripts/test/test-upload.js upload-test/small.MP4
+
+# Or from scripts/test directory:
 cd scripts/test
-node test-upload.js /path/to/your/video.mp4
+node test-upload.js ../../upload-test/small.MP4
 ```
 
 **Expected Output:**
@@ -41,15 +51,25 @@ node test-upload.js /path/to/your/video.mp4
 
 **Common Issues:**
 - Storage bucket not configured → Check Supabase dashboard
-- RLS policies blocking upload → Review bucket policies
+- RLS policies blocking upload → Review bucket policies or use authenticated session
 - File too large → Check Supabase storage limits
+- Note: Files are uploaded to `upload-test/` prefix in storage
+
+**Important:** The storage buckets require authentication. You have two options:
+1. Update RLS policies in Supabase dashboard to allow anon uploads (not recommended for production)
+2. Run the tests through the authenticated app interface
+3. Use `test-upload-admin.js` with a valid service role key
 
 ### 2. Frame Extraction Test
 Tests extracting frames from video at 5-second intervals.
 
 ```bash
+# From project root:
+node scripts/test/test-frame-extraction.js upload-test/small.MP4
+
+# Or from scripts/test directory:
 cd scripts/test
-node test-frame-extraction.js /path/to/your/video.mp4
+node test-frame-extraction.js ../../upload-test/small.MP4
 ```
 
 **Expected Output:**
@@ -63,14 +83,15 @@ node test-frame-extraction.js /path/to/your/video.mp4
 - FFmpeg not installed → Install via package manager
 - Temporary directory permissions → Check write permissions
 - Frame upload failures → Check frames bucket configuration
+- Note: Frames are temporarily stored in `upload-test/temp-frames/`
+- Note: Uploaded frames use `upload-test/frames/` prefix in storage
 
 ### 3. AI Analysis Test
 Tests OpenAI Vision API for analyzing cooking frames.
 
 ```bash
-cd scripts/test
-# Single image
-node test-ai-analysis.js https://example.com/cooking-image.jpg
+# From project root:
+node scripts/test/test-ai-analysis.js https://example.com/cooking-image.jpg
 
 # Multiple images
 node test-ai-analysis.js https://example.com/image1.jpg https://example.com/image2.jpg
@@ -92,8 +113,8 @@ node test-ai-analysis.js https://example.com/image1.jpg https://example.com/imag
 Tests pgvector embedding storage and similarity search.
 
 ```bash
-cd scripts/test
-node test-embeddings.js
+# From project root:
+node scripts/test/test-embeddings.js
 ```
 
 **Expected Output:**
@@ -112,8 +133,8 @@ node test-embeddings.js
 Tests generating recipes from frame descriptions.
 
 ```bash
-cd scripts/test
-node test-recipe-generation.js
+# From project root:
+node scripts/test/test-recipe-generation.js
 ```
 
 **Expected Output:**

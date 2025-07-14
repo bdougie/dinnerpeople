@@ -76,7 +76,7 @@ As a user, I would like to upload a recipe video that captures metadata and desc
 ## Performance Requirements
 
 - **Upload speed** - Limited only by user's internet connection
-- **Processing time** - < 2 minutes for 5-minute video
+- **Processing time** - < 30 30 seconds for 3-minute video (max 3 minutes)
 - **Background processing** - Non-blocking UI
 - **Real-time updates** - < 1 second latency
 - **Search response** - < 500ms for vector search

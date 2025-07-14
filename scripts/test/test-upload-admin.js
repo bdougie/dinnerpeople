@@ -7,49 +7,64 @@ import { fileURLToPath } from 'url';
 // Get current directory
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Initialize Supabase client
+// Initialize Supabase client with service role (bypasses RLS)
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl || (!supabaseServiceKey && !supabaseAnonKey)) {
   console.error('Missing Supabase environment variables');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Use service role key if available, otherwise fall back to anon key
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+
+if (supabaseServiceKey) {
+  console.log('🔐 Using service role key (bypasses RLS)\n');
+} else {
+  console.log('🔑 Using anon key (subject to RLS policies)\n');
+}
 
 // Test video upload functionality
 async function testVideoUpload() {
   console.log('🚀 Testing video upload to Supabase Storage...\n');
 
   try {
-    // Check authentication status
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError) {
-      console.log('⚠️  Auth error:', authError.message);
-    } else if (!session) {
-      console.log('⚠️  No authenticated session. Using anon key - storage policies may restrict access.');
-      console.log('💡 Tip: The app normally handles authentication. This test uses anon access.\n');
-    } else {
-      console.log('✅ Authenticated as:', session.user.email, '\n');
-    }
     // Create a test video file (we'll use a small sample file)
     const testVideoPath = process.argv[2];
     
     if (!testVideoPath) {
       console.error('Please provide a video file path as argument');
-      console.log('Usage: node test-upload.js <path-to-video-file>');
+      console.log('Usage: node test-upload-admin.js <path-to-video-file>');
       process.exit(1);
     }
 
-    // First, let's check if we can list buckets
-    console.log('🔍 Checking storage access...');
+    // Check if buckets exist
+    console.log('🔍 Checking storage buckets...');
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
     if (bucketsError) {
       console.error('❌ Cannot list buckets:', bucketsError);
-    } else {
-      console.log('📦 Available buckets:', buckets.map(b => b.name).join(', '));
+      return;
+    }
+    
+    console.log('📦 Available buckets:', buckets.map(b => `${b.name} (${b.public ? 'public' : 'private'})`).join(', '));
+    
+    // Check if videos bucket exists
+    const videosBucket = buckets.find(b => b.name === 'videos');
+    if (!videosBucket) {
+      console.log('\n⚠️  "videos" bucket not found. Creating it...');
+      const { data: newBucket, error: createError } = await supabase.storage.createBucket('videos', {
+        public: false,
+        fileSizeLimit: 104857600 // 100MB
+      });
+      
+      if (createError) {
+        console.error('❌ Failed to create bucket:', createError);
+        return;
+      }
+      console.log('✅ Created "videos" bucket');
     }
 
     console.log(`\n📁 Reading video file: ${testVideoPath}`);
@@ -85,7 +100,7 @@ async function testVideoUpload() {
     console.log('\n📋 Listing files in videos bucket:');
     const { data: listData, error: listError } = await supabase.storage
       .from('videos')
-      .list('', {
+      .list('upload-test', {
         limit: 10,
         offset: 0,
         sortBy: { column: 'created_at', order: 'desc' }
@@ -94,7 +109,7 @@ async function testVideoUpload() {
     if (listError) {
       console.error('❌ Failed to list files:', listError);
     } else {
-      console.log(`Found ${listData.length} files:`);
+      console.log(`Found ${listData.length} files in upload-test folder:`);
       listData.forEach(file => {
         console.log(`  - ${file.name} (${(file.metadata.size / 1024 / 1024).toFixed(2)} MB)`);
       });
@@ -112,19 +127,10 @@ async function testVideoUpload() {
       console.log(`✅ Download successful! Size: ${(downloadData.size / 1024 / 1024).toFixed(2)} MB`);
     }
 
-    // Clean up - delete test file
-    console.log(`\n🗑️  Cleaning up - deleting test file...`);
-    const { error: deleteError } = await supabase.storage
-      .from('videos')
-      .remove([uploadData.path]);
-
-    if (deleteError) {
-      console.error('❌ Failed to delete test file:', deleteError);
-    } else {
-      console.log('✅ Test file deleted successfully');
-    }
-
-    console.log('\n✨ Video upload test completed successfully!');
+    // Ask user if they want to delete the test file
+    console.log(`\n✨ Video upload test completed successfully!`);
+    console.log(`\n💡 Test file location: ${uploadData.path}`);
+    console.log('⚠️  Note: Test file was NOT deleted. Delete manually if needed.');
 
   } catch (error) {
     console.error('❌ Test failed:', error);

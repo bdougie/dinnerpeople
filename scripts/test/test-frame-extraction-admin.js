@@ -8,16 +8,23 @@ import { fileURLToPath } from 'url';
 // Get current directory
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Initialize Supabase client
+// Initialize Supabase client with service role
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl || (!supabaseServiceKey && !supabaseAnonKey)) {
   console.error('Missing Supabase environment variables');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+
+if (supabaseServiceKey) {
+  console.log('🔐 Using service role key (bypasses RLS)\n');
+} else {
+  console.log('🔑 Using anon key (subject to RLS policies)\n');
+}
 
 // Extract frames from video using ffmpeg
 async function extractFrames(videoPath, outputDir, interval = 5) {
@@ -62,7 +69,7 @@ async function testFrameExtraction() {
     
     if (!videoPath) {
       console.error('Please provide a video file path as argument');
-      console.log('Usage: node test-frame-extraction.js <path-to-video-file>');
+      console.log('Usage: node test-frame-extraction-admin.js <path-to-video-file>');
       process.exit(1);
     }
 
@@ -130,18 +137,12 @@ async function testFrameExtraction() {
       console.log(`  ${frame.timestamp}s: ${frame.url}`);
     });
 
-    // Clean up uploaded frames
-    console.log('\n🗑️  Cleaning up uploaded frames...');
-    const pathsToDelete = uploadedFrames.map(f => f.path);
-    const { error: deleteError } = await supabase.storage
-      .from('frames')
-      .remove(pathsToDelete);
-
-    if (deleteError) {
-      console.error('❌ Failed to delete frames:', deleteError);
-    } else {
-      console.log('✅ Frames deleted successfully');
-    }
+    // Ask about cleanup
+    console.log('\n💡 Uploaded frames locations:');
+    uploadedFrames.forEach(frame => {
+      console.log(`  - ${frame.path}`);
+    });
+    console.log('⚠️  Note: Uploaded frames were NOT deleted. Delete manually if needed.');
 
     // Clean up temp directory
     console.log('\n🧹 Cleaning up temporary files...');
