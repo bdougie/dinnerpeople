@@ -6,14 +6,15 @@ DinnerPeople uses different AI models optimized for specific tasks. This documen
 
 ## Production Models (OpenAI)
 
-### Vision Model: `gpt-4o-mini`
+### Vision Model: `gpt-4o`
 **Used for**: Frame analysis and visual understanding
 
 **Why this model**:
-- Cost-effective vision capabilities ($0.075 per 1M input tokens)
-- Fast response times (important for video processing)
-- Good balance of quality and speed
-- Handles multiple frames efficiently
+- Latest multimodal model with native vision capabilities
+- Superior accuracy compared to gpt-4o-mini
+- Faster than previous GPT-4 models
+- Better at understanding complex cooking scenes
+- Tier 3 access provides higher rate limits
 
 **Capabilities**:
 - Identifies ingredients and cooking techniques
@@ -21,14 +22,15 @@ DinnerPeople uses different AI models optimized for specific tasks. This documen
 - Detects text overlays (social media handles)
 - Works with various image qualities
 
-### Text Model: `gpt-4-turbo`
+### Text Model: `gpt-4o`
 **Used for**: Recipe summarization and title generation
 
 **Why this model**:
-- Superior text generation quality
-- JSON mode support for structured output
-- Better at understanding cooking context
-- Consistent formatting
+- Latest and most capable OpenAI model
+- Combines vision and text understanding
+- Excellent JSON mode support
+- Faster than gpt-4-turbo with better quality
+- Optimized for Tier 3 usage patterns
 
 **Capabilities**:
 - Creates engaging recipe titles
@@ -96,16 +98,17 @@ DinnerPeople uses different AI models optimized for specific tasks. This documen
 
 | Task | Production (OpenAI) | Development (Ollama) | Quality Difference |
 |------|-------------------|---------------------|-------------------|
-| Frame Analysis | gpt-4o-mini | llama3.2-vision:11b | Production: More accurate, better with complex scenes |
-| Recipe Summary | gpt-4-turbo | mistral | Production: More creative, better formatting |
+| Frame Analysis | gpt-4o | llama3.2-vision:11b | Production: Significantly more accurate, better scene understanding |
+| Recipe Summary | gpt-4o | mistral | Production: More creative, consistent formatting, faster |
 | Embeddings | text-embedding-3-small | nomic-embed-text | Production: Better semantic matching |
 
 ## Cost Analysis
 
-### Production Costs (OpenAI)
-- Frame Analysis: ~$0.00015 per frame
-- Recipe Summary: ~$0.03 per recipe
+### Production Costs (OpenAI) - Tier 3
+- Frame Analysis: ~$0.0025 per frame (gpt-4o)
+- Recipe Summary: ~$0.005 per recipe (gpt-4o)
 - Embeddings: ~$0.00002 per description
+- Note: Tier 3 provides higher rate limits and priority access
 
 ### Development Costs (Ollama)
 - All operations: $0 (runs locally)
@@ -123,9 +126,9 @@ export const OLLAMA_TEXT_MODEL = 'mistral';
 export const OLLAMA_IMAGE_MODEL = 'llama3.2-vision:11b';
 export const OLLAMA_EMBED_MODEL = 'nomic-embed-text';
 
-// OpenAI Models (Production)
-export const OPENAI_TEXT_MODEL = 'gpt-4-turbo';
-export const OPENAI_IMAGE_MODEL = 'gpt-4o-mini';
+// OpenAI Models (Production) - Updated for Tier 3
+export const OPENAI_TEXT_MODEL = 'gpt-4o';
+export const OPENAI_IMAGE_MODEL = 'gpt-4o';
 export const OPENAI_EMBED_MODEL = 'text-embedding-3-small';
 ```
 

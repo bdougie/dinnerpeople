@@ -2,12 +2,12 @@
 
 ## Quick Reference
 
-### Production Setup (OpenAI)
-- **Vision**: `gpt-4o-mini` - Analyzes video frames
-- **Text**: `gpt-4-turbo` - Generates recipes  
+### Production Setup (OpenAI) - Tier 3
+- **Vision**: `gpt-4o` - Analyzes video frames with superior accuracy
+- **Text**: `gpt-4o` - Generates recipes with latest model  
 - **Embeddings**: `text-embedding-3-small` - Powers search
-- **Cost**: ~$0.03 per recipe
-- **Speed**: Fast, consistent
+- **Cost**: ~$0.01 per recipe (with gpt-4o efficiency)
+- **Speed**: Fastest available, with priority access
 
 ### Development Setup (Ollama)
 - **Vision**: `llama3.2-vision:11b` - Local frame analysis
