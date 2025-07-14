@@ -32,7 +32,7 @@ class AIService {
       : openai.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl);
   }
 
-  async updateRecipeWithSummary(recipeId: string): Promise<void> {
+  async updateRecipeWithSummary(recipeId: string): Promise<RecipeSummary> {
     // Use Ollama for local development, OpenAI for production
     return this.isLocalEnvironment()
       ? ollama.updateRecipeWithSummary(recipeId)

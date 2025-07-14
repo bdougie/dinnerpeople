@@ -164,10 +164,12 @@ export default function Upload() {
           (payload) => {
             console.log("[DEBUG] Received realtime update:", payload);
             const newData = payload.new as { status?: string; error?: string };
-            setProcessingStatus({
-              status: newData.status,
-              error: newData.error,
-            });
+            if (newData.status) {
+              setProcessingStatus({
+                status: newData.status as "pending" | "processing" | "completed" | "failed",
+                error: newData.error,
+              });
+            }
             console.log(
               "[DEBUG] Updated processing status to:",
               newData.status
