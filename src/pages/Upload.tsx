@@ -18,6 +18,7 @@ import {
 } from "../lib/openai";
 import { ai } from "../lib/ai";
 import { processSocialHandles } from "../lib/prompt-utils";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // Include this helper function at the top of your file
 function extractHandleFromUrl(url: string): string {
@@ -162,19 +163,20 @@ export default function Upload() {
           },
           (payload) => {
             console.log("[DEBUG] Received realtime update:", payload);
+            const newData = payload.new as { status?: string; error?: string };
             setProcessingStatus({
-              status: payload.new.status,
-              error: payload.new.error,
+              status: newData.status,
+              error: newData.error,
             });
             console.log(
               "[DEBUG] Updated processing status to:",
-              payload.new.status
+              newData.status
             );
 
-            if (payload.new.status === "completed") {
+            if (newData.status === "completed") {
               toast.success("Video processing completed!");
-            } else if (payload.new.status === "failed") {
-              toast.error(`Processing failed: ${payload.new.error}`);
+            } else if (newData.status === "failed") {
+              toast.error(`Processing failed: ${newData.error}`);
             }
           }
         )

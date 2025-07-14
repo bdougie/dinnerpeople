@@ -23,7 +23,6 @@ function extractHandleFromUrl(url: string): string {
 // Interface for recipe data with additional status field
 interface RecipeWithStatus extends Recipe {
   status?: string;
-  attribution?: string;
 }
 
 // Default fallback image for recipes without thumbnails
@@ -85,8 +84,8 @@ export default function MyRecipes() {
   const handleSaveDetails = async () => {
     if (!selectedUpload) return;
 
-    let socialUrl = editedDetails.social.trim();
-    let videoUrl = editedDetails.videoUrl.trim();
+    const socialUrl = editedDetails.social.trim();
+    const videoUrl = editedDetails.videoUrl.trim();
 
     const urlPattern =
       /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;

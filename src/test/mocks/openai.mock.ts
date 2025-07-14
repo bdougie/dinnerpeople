@@ -19,7 +19,7 @@ export const createOpenAIMock = () => {
         create: vi.fn().mockImplementation(async (params) => {
           // Check if it's a frame analysis request by checking if content is an array
           if (Array.isArray(params.messages[0].content) && 
-              params.messages[0].content.some(c => c.type === 'image_url')) {
+              params.messages[0].content.some((c: { type: string }) => c.type === 'image_url')) {
             return {
               choices: [{
                 message: {
