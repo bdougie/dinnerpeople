@@ -94,21 +94,27 @@ describe('AI Service Integration Tests', () => {
         writable: true
       });
       
-      // Need to re-import to get fresh instance
-      vi.resetModules();
-      const { ai } = await import('./ai');
+      // Set environment variable to enable Ollama
+      vi.stubEnv('VITE_USE_OLLAMA', 'true');
       
-      // Mock ollama
-      vi.mock('./ollama', () => ({
+      // Mock ollama before importing
+      vi.doMock('./ollama', () => ({
         ollama: {
           analyzeFrame: vi.fn().mockResolvedValue('Ollama response')
         }
       }));
       
+      // Need to re-import to get fresh instance
+      vi.resetModules();
+      const { ai } = await import('./ai');
+      
       const result = await ai.analyzeFrame('https://example.com/image.jpg');
       
       // Should use Ollama in local env
       expect(result).toBe('Ollama response');
+      
+      // Clean up
+      vi.unstubAllEnvs();
     });
   });
 });

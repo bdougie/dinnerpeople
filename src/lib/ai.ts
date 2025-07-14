@@ -11,7 +11,7 @@ import type { RecipeSummary } from './prompt-utils';
 class AIService {
   private useOllama(): boolean {
     // Check if Ollama is explicitly enabled via environment variable
-    const ollamaEnabled = import.meta.env.VITE_USE_OLLAMA === 'true';
+    const ollamaEnabled = import.meta.env['VITE_USE_OLLAMA'] === 'true';
     
     // Only use Ollama if explicitly enabled AND in local environment
     if (!ollamaEnabled) {
