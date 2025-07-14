@@ -1,5 +1,4 @@
 import { vi } from 'vitest';
-import { OPENAI_EMBED_MODEL } from '../../lib/constants';
 
 // Mock OpenAI responses
 export const mockOpenAIResponses = {
@@ -8,7 +7,7 @@ export const mockOpenAIResponses = {
     title: 'Vegetable Stir Fry',
     description: 'A quick and healthy vegetable stir fry with fresh ingredients.'
   },
-  embedding: new Array(1536).fill(0).map((_, i) => Math.random())
+  embedding: new Array(1536).fill(0).map(() => Math.random())
 };
 
 // Create OpenAI mock
@@ -19,7 +18,7 @@ export const createOpenAIMock = () => {
         create: vi.fn().mockImplementation(async (params) => {
           // Check if it's a frame analysis request by checking if content is an array
           if (Array.isArray(params.messages[0].content) && 
-              params.messages[0].content.some(c => c.type === 'image_url')) {
+              params.messages[0].content.some((c: { type: string }) => c.type === 'image_url')) {
             return {
               choices: [{
                 message: {

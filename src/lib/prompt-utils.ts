@@ -93,7 +93,8 @@ export function parseRecipeSummaryResponse(response: string): RecipeSummary {
   } catch (e) {
     console.error('Failed to parse AI response as JSON:', e);
     // Log more details about the error
-    console.error('[DEBUG] Error details:', e.message);
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    console.error('[DEBUG] Error details:', errorMessage);
     
     return {
       title: 'Unknown Recipe',

@@ -6,20 +6,6 @@ interface AttributionFormProps {
   onSubmit: () => void;
 }
 
-// Helper function to extract handle from URL
-function extractHandleFromUrl(url: string): string {
-  try {
-    // Remove trailing slash if present
-    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
-    // Get the last part of the URL path
-    const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
-    const handle = parts[parts.length - 1];
-    return handle ? `@${handle}` : url;
-  } catch (e) {
-    // If URL parsing fails, return the original string
-    return url;
-  }
-}
 
 export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
   const [loading, setLoading] = useState(true);
@@ -64,8 +50,8 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
               setOriginalUrl(
                 attributionObj.original_url || data.attribution_url || ""
               );
-            } catch (e) {
-              console.error("Failed to parse attribution JSON:", e);
+            } catch {
+              console.error("Failed to parse attribution JSON");
               // If parsing fails, fall back to legacy fields
               setOriginalUrl(data.attribution_url || "");
             }
@@ -131,9 +117,9 @@ export function AttributionForm({ recipeId, onSubmit }: AttributionFormProps) {
       if (error) throw error;
 
       onSubmit();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating attribution:", error);
-      setError(error.message);
+      setError(error instanceof Error ? error.message : "An error occurred");
     }
   };
 

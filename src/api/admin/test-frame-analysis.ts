@@ -1,6 +1,7 @@
+import { Request, Response } from 'express';
 import { ai } from '../../lib/ai';
 
-export default async function handler(req, res) {
+export default async function handler(req: Request, res: Response) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ analysis });
   } catch (error) {
     console.error('Error in test-frame-analysis endpoint:', error);
-    return res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return res.status(500).json({ error: errorMessage });
   }
 }

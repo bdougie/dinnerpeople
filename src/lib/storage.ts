@@ -153,7 +153,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
         
         // Upload the thumbnail
         const thumbnailPath = `${userId}/${recipeId}.jpg`;
-        const { data: thumbData, error: thumbError } = await supabase.storage
+        const { error: thumbError } = await supabase.storage
           .from('thumbnails')
           .upload(thumbnailPath, blob);
           
@@ -189,16 +189,18 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       recipeId,
       processingStatus: 'processing' 
     };
-  } catch (error: any) {
+  } catch (error) {
     // Catch and rethrow errors, including network issues that might occur during large uploads
     console.error('[DEBUG] Upload exception:', error);
     
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
     // Check if it's already a payload size error
     if (
-      error.message?.includes("payload too large") ||
-      error.message?.includes("request entity too large") ||
-      error.message?.includes("413") ||
-      error.message?.includes("size limit")
+      errorMessage.includes("payload too large") ||
+      errorMessage.includes("request entity too large") ||
+      errorMessage.includes("413") ||
+      errorMessage.includes("size limit")
     ) {
       throw error; // Already formatted, just rethrow
     }
@@ -208,7 +210,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .from('processing_queue')
       .update({ 
         status: 'failed',
-        error: `Upload failed: ${error.message}`
+        error: `Upload failed: ${errorMessage}`
       })
       .eq('recipe_id', recipeId);
       

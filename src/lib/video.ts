@@ -77,7 +77,7 @@ export async function uploadFrames(frames: { timestamp: number, blob: Blob }[], 
     // Include user_id in the path to avoid permission issues
     const path = `${userData.user.id}/${recipeId}/${frame.timestamp}.jpg`;
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('frames')
       .upload(path, frame.blob);
 

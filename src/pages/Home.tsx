@@ -5,7 +5,6 @@ import {
   X as CloseIcon,
   Heart,
   Bookmark,
-  Share2,
 } from "lucide-react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import MDEditor from "@uiw/react-md-editor";

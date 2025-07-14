@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
-import { supabase, formatAttribution } from './supabase';
+import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
+import { RecipeSummary } from './prompt-utils';
 import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL, OPENAI_EMBED_MODEL } from './constants';
 
 const openai = new OpenAI({
@@ -180,7 +181,7 @@ export async function generateRecipeSummaryWithCustomPrompt(
 /**
  * Update recipe with AI-generated title and description
  */
-export async function updateRecipeWithSummary(recipeId: string): Promise<void> {
+export async function updateRecipeWithSummary(recipeId: string): Promise<RecipeSummary> {
   return PromptUtils.summarizeAndUpdateRecipe(recipeId, generateRecipeSummary);
 }
 

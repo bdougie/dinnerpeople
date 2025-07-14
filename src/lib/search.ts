@@ -247,9 +247,10 @@ export async function initializeSearchFunctions(): Promise<{success: boolean, me
     };
   } catch (error) {
     console.error('Error initializing search functions:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return {
       success: false,
-      message: `Unexpected error: ${error.message}`
+      message: `Unexpected error: ${errorMessage}`
     };
   }
 }

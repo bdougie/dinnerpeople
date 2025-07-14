@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
+import { RecipeSummary } from './prompt-utils';
 import { OLLAMA_TEXT_MODEL, OLLAMA_IMAGE_MODEL, OLLAMA_EMBED_MODEL } from './constants';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -11,12 +12,6 @@ interface OllamaResponse {
   done: boolean;
 }
 
-interface OllamaRequest {
-  model: string;
-  prompt: string;
-  stream?: boolean;
-  options?: Record<string, any>;
-}
 
 class OllamaAPI {
   private baseUrl: string;
@@ -65,7 +60,12 @@ class OllamaAPI {
     try {
       console.log(`[DEBUG] Sending completion request to Ollama with model ${this.model}`);
       
-      const requestBody: any = {
+      const requestBody: {
+        model: string;
+        prompt: string;
+        stream: boolean;
+        images?: string[];
+      } = {
         model: this.model,
         prompt,
         stream: false
@@ -253,7 +253,7 @@ class OllamaAPI {
 
       // Generate embedding
       const embedding = await this.generateEmbedding(description);
-      let paddedEmbedding = this.padEmbedding(embedding, 1536);
+      const paddedEmbedding = this.padEmbedding(embedding, 1536);
 
       // Insert frame after ownership verification
       const { error: insertError } = await supabase.from('video_frames').insert({
@@ -332,7 +332,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
         return {
           title: title,
           description: 'A delicious recipe created from cooking video. ' + 
-                      response.substring(0, 100).replace(/["{}\[\]]/g, '') + '...'
+                      response.substring(0, 100).replace(/["{}[\]]/g, '') + '...'
         };
       }
     } catch (error) {
@@ -348,7 +348,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
   /**
    * Update recipe with AI-generated title and description
    */
-  async updateRecipeWithSummary(recipeId: string): Promise<void> {
+  async updateRecipeWithSummary(recipeId: string): Promise<RecipeSummary> {
     return PromptUtils.summarizeAndUpdateRecipe(recipeId, this.generateRecipeSummary.bind(this));
   }
 
@@ -395,9 +395,10 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       return PromptUtils.parseRecipeSummaryResponse(data.response);
     } catch (error) {
       console.error('Error generating recipe summary with Ollama:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       return {
         title: 'Error Generating Recipe',
-        description: `There was an error processing this recipe: ${error.message}. Please ensure Ollama is running on localhost:11434.`
+        description: `There was an error processing this recipe: ${errorMessage}. Please ensure Ollama is running on localhost:11434.`
       };
     }
   }
@@ -441,8 +442,9 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       };
     } catch (error) {
       console.error('Error detecting social media handles with Ollama:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       return {
-        rawResponse: `Error: ${error.message}`,
+        rawResponse: `Error: ${errorMessage}`,
         socialHandles: []
       };
     }

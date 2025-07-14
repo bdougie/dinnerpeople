@@ -1,10 +1,11 @@
+import { Request, Response } from 'express';
 import * as PromptUtils from '../../../lib/prompt-utils';
 
 // Import constants from a shared configuration file
 import { TEXT_MODEL } from '../../../lib/constants';
 
 // Express-compatible handler instead of Next.js API route
-export default async function handler(req, res) {
+export default async function handler(req: Request, res: Response) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -74,8 +75,8 @@ export default async function handler(req, res) {
                 res.write(JSON.stringify(parsed.response));
               }
             }
-          } catch (e) {
-            console.error('Error parsing streamed response:', e, text);
+          } catch (parseError) {
+            console.error('Error parsing streamed response:', parseError, text);
           }
         }
 
@@ -83,9 +84,10 @@ export default async function handler(req, res) {
         res.end();
       } catch (streamError) {
         console.error('Streaming error:', streamError);
+        const errorMessage = streamError instanceof Error ? streamError.message : 'An unknown error occurred';
         return res.status(500).json({ 
           error: 'Error processing streaming response',
-          details: streamError.message,
+          details: errorMessage,
           partialResponse: responseBuffer
         });
       }
@@ -113,20 +115,21 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Error processing recipe summary:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return res.status(500).json({ 
       error: 'Failed to generate recipe summary',
-      details: error.message
+      details: errorMessage
     });
   }
 }
 
-function formatCookingSteps(frames) {
+function formatCookingSteps(frames: Array<{ timestamp: number; description: string }>) {
   return frames
     .map(frame => `[${frame.timestamp}s]: ${frame.description}`)
     .join('\n\n');
 }
 
-function createConsistentPrompt(cookingSteps, customPrompt) {
+function createConsistentPrompt(cookingSteps: string, customPrompt?: string) {
   if (customPrompt) {
     return customPrompt.replace('{steps}', cookingSteps);
   } else {

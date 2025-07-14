@@ -1,9 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '../../../lib/supabase';
+import { Request, Response } from 'express';
 
 export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
+  req: Request,
+  res: Response
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -34,7 +33,7 @@ export default async function handler(
           prompt: 'Return only the word "OK" if you can read this message.',
           stream: false
         }),
-        timeout: 5000 // 5 second timeout
+        signal: AbortSignal.timeout(5000) // 5 second timeout
       });
       
       if (response.ok) {
@@ -45,13 +44,13 @@ export default async function handler(
         try {
           const modelsResponse = await fetch(process.env.OLLAMA_API_URL || 'http://localhost:11434/api/tags', {
             method: 'GET',
-            timeout: 5000
+            signal: AbortSignal.timeout(5000)
           });
           
           if (modelsResponse.ok) {
             const modelsData = await modelsResponse.json();
             if (modelsData.models) {
-              availableModels = modelsData.models.map(m => m.name);
+              availableModels = modelsData.models.map((m: { name: string }) => m.name);
             }
           }
         } catch (modelError) {
@@ -62,7 +61,7 @@ export default async function handler(
         ollamaStatus = `error: ${response.status}`;
       }
     } catch (error) {
-      ollamaStatus = `connection error: ${error.message}`;
+      ollamaStatus = `connection error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
 
     return res.status(200).json({
@@ -87,9 +86,10 @@ export default async function handler(
 
   } catch (error) {
     console.error('Error fixing streaming issue:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({ 
       error: 'Failed to fix streaming issue',
-      details: error.message
+      details: errorMessage
     });
   }
 }

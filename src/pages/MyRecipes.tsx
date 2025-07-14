@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MDEditor from "@uiw/react-md-editor";
 import { RecipeTab } from "../types";
@@ -14,16 +14,27 @@ function extractHandleFromUrl(url: string): string {
     const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
     const handle = parts[parts.length - 1];
     return handle ? `@${handle}` : url;
-  } catch (e) {
+  } catch {
     // If URL parsing fails, return the original string
     return url;
   }
 }
 
 // Interface for recipe data with additional status field
-interface RecipeWithStatus extends Recipe {
+interface RecipeWithStatus extends Omit<Recipe, 'attribution'> {
   status?: string;
-  attribution?: string;
+  attribution?: string; // Database stores as JSON string
+}
+
+// Helper function to parse attribution string
+function parseAttribution(attributionStr?: string): { handle?: string; original_url?: string } | undefined {
+  if (!attributionStr) return undefined;
+  try {
+    return JSON.parse(attributionStr);
+  } catch {
+    console.error('Error parsing attribution');
+    return undefined;
+  }
 }
 
 // Default fallback image for recipes without thumbnails
@@ -60,16 +71,10 @@ export default function MyRecipes() {
     let social = "";
     let videoUrl = "";
 
-    if (recipe.attribution) {
-      try {
-        const attributionObj = JSON.parse(recipe.attribution);
-        social = attributionObj?.handle || "";
-        videoUrl = attributionObj?.original_url || "";
-      } catch (e) {
-        console.error("Error parsing attribution:", e);
-        social = "";
-        videoUrl = "";
-      }
+    const attributionObj = parseAttribution(recipe.attribution);
+    if (attributionObj) {
+      social = attributionObj.handle || "";
+      videoUrl = attributionObj.original_url || "";
     }
 
     setEditedDetails({
@@ -85,8 +90,8 @@ export default function MyRecipes() {
   const handleSaveDetails = async () => {
     if (!selectedUpload) return;
 
-    let socialUrl = editedDetails.social.trim();
-    let videoUrl = editedDetails.videoUrl.trim();
+    const socialUrl = editedDetails.social.trim();
+    const videoUrl = editedDetails.videoUrl.trim();
 
     const urlPattern =
       /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?$/;
@@ -148,8 +153,8 @@ export default function MyRecipes() {
           : null
       );
       setIsEditingDetails(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -179,8 +184,8 @@ export default function MyRecipes() {
         prev ? { ...prev, instructions: editedInstructions } : null
       );
       setIsEditing(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +199,7 @@ export default function MyRecipes() {
 
   useEffect(() => {
     fetchRecipes();
-  }, [activeTab]);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchRecipes = async () => {
     setIsLoading(true);
@@ -246,25 +251,38 @@ export default function MyRecipes() {
         if (error) throw error;
 
         const formattedRecipes = data
-          .filter((item) => item.recipes)
-          .map((item) => ({
-            id: item.recipes.id,
-            title: item.recipes.title || "Untitled Recipe",
-            description: item.recipes.description || "",
-            thumbnailUrl: item.recipes.thumbnail_url || DEFAULT_THUMBNAIL,
-            ingredients: item.recipes.ingredients || [],
-            instructions: item.recipes.instructions || "",
-            userId: item.recipes.user_id,
-            createdAt: item.recipes.created_at,
-            attribution: item.recipes.attribution || "",
-            status: "processed",
-          }));
+          .filter((item) => item.recipes && !Array.isArray(item.recipes))
+          .map((item) => {
+            const recipe = item.recipes as unknown as {
+              id: string;
+              title: string;
+              description: string;
+              thumbnail_url: string;
+              ingredients: string[];
+              instructions: string;
+              user_id: string;
+              created_at: string;
+              attribution?: string;
+            };
+            return {
+              id: recipe.id,
+              title: recipe.title || "Untitled Recipe",
+              description: recipe.description || "",
+              thumbnailUrl: recipe.thumbnail_url || DEFAULT_THUMBNAIL,
+              ingredients: recipe.ingredients || [],
+              instructions: recipe.instructions || "",
+              userId: recipe.user_id,
+              createdAt: recipe.created_at,
+              attribution: recipe.attribution || "",
+              status: "processed" as const,
+            };
+          });
 
         setRecipes(formattedRecipes);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching recipes:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "An error occurred");
       setRecipes([]);
     } finally {
       setIsLoading(false);
@@ -460,41 +478,38 @@ export default function MyRecipes() {
                 <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   <p className="italic">Attribution:</p>
                   {(() => {
-                    try {
-                      const attr = JSON.parse(selectedUpload.attribution);
-                      return (
-                        <div className="mt-1 space-y-1">
-                          {attr.handle && (
-                            <p>
-                              Social:{" "}
-                              <a
-                                href={attr.handle}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 dark:text-blue-400 hover:underline"
-                              >
-                                {extractHandleFromUrl(attr.handle)}
-                              </a>
-                            </p>
-                          )}
-                          {attr.original_url && (
-                            <p>
-                              Source:{" "}
-                              <a
-                                href={attr.original_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 dark:text-blue-400 hover:underline"
-                              >
-                                {new URL(attr.original_url).hostname}
-                              </a>
-                            </p>
-                          )}
-                        </div>
-                      );
-                    } catch (e) {
-                      return selectedUpload.attribution;
-                    }
+                    const attr = parseAttribution(selectedUpload.attribution);
+                    if (!attr) return selectedUpload.attribution;
+                    return (
+                      <div className="mt-1 space-y-1">
+                        {attr.handle && (
+                          <p>
+                            Social:{" "}
+                            <a
+                              href={attr.handle}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              {extractHandleFromUrl(attr.handle)}
+                            </a>
+                          </p>
+                        )}
+                        {attr.original_url && (
+                          <p>
+                            Source:{" "}
+                            <a
+                              href={attr.original_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              {new URL(attr.original_url).hostname}
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                    );
                   })()}
                 </div>
               )}

@@ -53,7 +53,7 @@ const AdminSandbox: React.FC = () => {
 
   // Loading states
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
-  const [isLoadingFrames, setIsLoadingFrames] = useState(false);
+  const [isLoadingFrames, setIsLoadingFrames] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [isTestingFrame, setIsTestingFrame] = useState(false);
   const [isTestingRecipe, setIsTestingRecipe] = useState(false);
   const [isTestingSocial, setIsTestingSocial] = useState(false);
@@ -86,7 +86,7 @@ const AdminSandbox: React.FC = () => {
   useEffect(() => {
     fetchRecentVideos();
     fetchAvailableModels();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load frames when a video is selected
   useEffect(() => {
@@ -250,7 +250,11 @@ const AdminSandbox: React.FC = () => {
       setFrameResult(result.analysis || "No result returned");
     } catch (error) {
       console.error("Error testing frame analysis:", error);
-      setFrameResult(`Error: ${error.message}`);
+      if (error instanceof Error) {
+        setFrameResult(`Error: ${error.message}`);
+      } else {
+        setFrameResult(`Error: ${String(error)}`);
+      }
     } finally {
       setIsTestingFrame(false);
     }
@@ -288,7 +292,7 @@ const AdminSandbox: React.FC = () => {
       console.error("Error testing recipe summary:", error);
 
       // Improve error display with better error extraction
-      let errorMessage = error.message || "Unknown error";
+      let errorMessage = error instanceof Error ? error.message : "Unknown error";
 
       // Extract structured error data if available
       try {
@@ -312,7 +316,7 @@ const AdminSandbox: React.FC = () => {
             }
           }
         }
-      } catch (parseError) {
+      } catch {
         // Silently continue if we can't parse the error details
       }
 
@@ -351,7 +355,11 @@ const AdminSandbox: React.FC = () => {
       setSocialResult(result.socialHandles || "No social handles detected");
     } catch (error) {
       console.error("Error testing social detection:", error);
-      setSocialResult(`Error: ${error.message}`);
+      if (error instanceof Error) {
+        setSocialResult(`Error: ${error.message}`);
+      } else {
+        setSocialResult(`Error: ${String(error)}`);
+      }
     } finally {
       setIsTestingSocial(false);
     }
@@ -367,9 +375,9 @@ const AdminSandbox: React.FC = () => {
         customPrompt
       );
       setSocialDetectionResult(detectionResult);
-    } catch (err: any) {
+    } catch (err) {
       setSocialDetectionError(
-        err.message || "An error occurred while detecting social handles."
+        err instanceof Error ? err.message : "An error occurred while detecting social handles."
       );
     }
   };
@@ -391,7 +399,11 @@ const AdminSandbox: React.FC = () => {
       setFixResults(JSON.stringify(result, null, 2));
     } catch (error) {
       console.error("Error fixing streaming issue:", error);
-      setFixResults(`Error: ${error.message}`);
+      if (error instanceof Error) {
+        setFixResults(`Error: ${error.message}`);
+      } else {
+        setFixResults(`Error: ${String(error)}`);
+      }
     } finally {
       setIsFixingUrls(false);
     }
@@ -471,8 +483,21 @@ const AdminSandbox: React.FC = () => {
 
   function SemanticSearchTester() {
     const [query, setQuery] = useState("");
-    const [recipeResults, setRecipeResults] = useState([]);
-    const [frameResults, setFrameResults] = useState([]);
+    const [recipeResults, setRecipeResults] = useState<Array<{
+      id: string;
+      title: string;
+      description?: string;
+      thumbnail_url?: string;
+      similarity: number;
+    }>>([]);
+    const [frameResults, setFrameResults] = useState<Array<{
+      id: string;
+      recipe_id: string;
+      timestamp: number;
+      description?: string;
+      image_url?: string;
+      similarity: number;
+    }>>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [isInitializing, setIsInitializing] = useState(false);
@@ -496,7 +521,11 @@ const AdminSandbox: React.FC = () => {
         setFrameResults(frames);
       } catch (err) {
         console.error("Search error:", err);
-        setError(`Search failed: ${err.message}`);
+        if (err instanceof Error) {
+          setError(`Search failed: ${err.message}`);
+        } else {
+          setError(`Search failed: ${String(err)}`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -511,7 +540,11 @@ const AdminSandbox: React.FC = () => {
         setInitMessage(result.message);
       } catch (err) {
         console.error("Error initializing functions:", err);
-        setInitMessage(`Error: ${err.message}`);
+        if (err instanceof Error) {
+          setInitMessage(`Error: ${err.message}`);
+        } else {
+          setInitMessage(`Error: ${String(err)}`);
+        }
       } finally {
         setIsInitializing(false);
       }

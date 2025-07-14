@@ -28,7 +28,7 @@ export default function Settings() {
       setMessage({ type: 'success', text: 'Password updated successfully' });
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
+    } catch {
       // Error is handled by the store
     }
   };
