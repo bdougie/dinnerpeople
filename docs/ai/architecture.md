@@ -60,6 +60,11 @@ Production AI provider:
 - **How**: Separate files with focused responsibilities
 - **Benefit**: Easier testing, maintenance, and debugging
 
+### Centralized Model Configuration
+- **Why**: Easy model management and experimentation
+- **How**: All models defined in `constants.ts`
+- **Benefit**: Change models in one place, applies everywhere
+
 ## Data Flow
 
 1. **Frame Analysis**

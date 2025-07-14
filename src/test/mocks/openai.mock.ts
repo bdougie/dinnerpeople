@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { OPENAI_EMBED_MODEL } from '../../lib/constants';
 
 // Mock OpenAI responses
 export const mockOpenAIResponses = {

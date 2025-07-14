@@ -1,19 +1,17 @@
 import OpenAI from 'openai';
 import { supabase, formatAttribution } from './supabase';
 import * as PromptUtils from './prompt-utils';
+import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL, OPENAI_EMBED_MODEL } from './constants';
 
 const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
-// Update model name from gpt-4-vision-preview to gpt-4o-mini
-const MODEL = 'gpt-4o-mini';
-
 export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: MODEL,
+      model: OPENAI_IMAGE_MODEL,
       messages: [
         {
           role: "user",
@@ -44,7 +42,7 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
     const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: OPENAI_EMBED_MODEL,
       input: text,
       encoding_format: "float"
     });
@@ -119,7 +117,7 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
     
     // Use OpenAI to generate a title and description
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: OPENAI_TEXT_MODEL,
       messages: [
         {
           role: "system", 
@@ -154,7 +152,7 @@ export async function generateRecipeSummaryWithCustomPrompt(
   try {
     // Use OpenAI to generate a title and description with the custom prompt
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: OPENAI_TEXT_MODEL,
       messages: [
         {
           role: "system", 

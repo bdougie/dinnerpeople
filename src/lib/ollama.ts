@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
-import { TEXT_MODEL, IMAGE_MODEL, EMBED_MODEL } from './constants';
+import { OLLAMA_TEXT_MODEL, OLLAMA_IMAGE_MODEL, OLLAMA_EMBED_MODEL } from './constants';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -22,7 +22,7 @@ class OllamaAPI {
   private baseUrl: string;
   private model: string;
 
-  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = IMAGE_MODEL) {
+  constructor(baseUrl: string = OLLAMA_BASE_URL, model: string = OLLAMA_IMAGE_MODEL) {
     this.baseUrl = baseUrl;
     this.model = model;
   }
@@ -183,7 +183,7 @@ class OllamaAPI {
     }
 
     try {
-      console.log(`[DEBUG] Generating embedding with ${EMBED_MODEL}`);
+      console.log(`[DEBUG] Generating embedding with ${OLLAMA_EMBED_MODEL}`);
       
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -191,7 +191,7 @@ class OllamaAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: EMBED_MODEL,
+          model: OLLAMA_EMBED_MODEL,
           prompt: text,
         }),
       });
@@ -201,8 +201,8 @@ class OllamaAPI {
         console.error(`[DEBUG] Ollama embedding error: ${errText}`);
         
         if (errText.includes("model") && errText.includes("not found")) {
-          console.error(`[DEBUG] Model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
-          throw new Error(`Ollama model '${EMBED_MODEL}' not found. Please run: ollama pull ${EMBED_MODEL}`);
+          console.error(`[DEBUG] Model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
+          throw new Error(`Ollama model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
         }
         
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
@@ -371,7 +371,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: TEXT_MODEL, // Use the text model constant here
+          model: OLLAMA_TEXT_MODEL, // Use the text model constant here
           prompt: formattedPrompt,
           system: 'You are a culinary expert specializing in creating engaging and accurate recipe titles and descriptions.',
           format: 'json'
@@ -451,4 +451,4 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
 
 // Create and export a singleton instance
 // Use the image model constant
-export const ollama = new OllamaAPI('http://localhost:11434', IMAGE_MODEL);
+export const ollama = new OllamaAPI('http://localhost:11434', OLLAMA_IMAGE_MODEL);

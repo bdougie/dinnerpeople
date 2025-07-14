@@ -113,14 +113,23 @@ DinnerPeople uses different AI models optimized for specific tasks. This documen
 
 ## Switching Models
 
-To change models, update the constants in:
+All models are centrally configured in `src/lib/constants.ts`:
 
 ```typescript
 // src/lib/constants.ts
-export const TEXT_MODEL = 'mistral';              // Ollama text model
-export const IMAGE_MODEL = 'llama3.2-vision:11b'; // Ollama vision model  
-export const EMBED_MODEL = 'nomic-embed-text';    // Ollama embedding model
+
+// Ollama Models (Local Development)
+export const OLLAMA_TEXT_MODEL = 'mistral';
+export const OLLAMA_IMAGE_MODEL = 'llama3.2-vision:11b';
+export const OLLAMA_EMBED_MODEL = 'nomic-embed-text';
+
+// OpenAI Models (Production)
+export const OPENAI_TEXT_MODEL = 'gpt-4-turbo';
+export const OPENAI_IMAGE_MODEL = 'gpt-4o-mini';
+export const OPENAI_EMBED_MODEL = 'text-embedding-3-small';
 ```
+
+To change a model, simply update the corresponding constant. The change will automatically apply to the appropriate service.
 
 ## Future Considerations
 
