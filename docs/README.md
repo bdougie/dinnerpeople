@@ -1,48 +1,21 @@
-# DinnerPeople AI Documentation
+# DinnerPeople Documentation
 
-## Overview
+## Architecture & Performance
 
-DinnerPeople uses a hybrid AI architecture that automatically switches between local (Ollama) and cloud (OpenAI) models based on the environment. This approach provides:
+- [Parallel Processing Optimization](./parallel-processing.md) - How we achieved 30s video processing through parallel API calls
 
-- **Development**: Fast, free local inference with Ollama
-- **Production**: High-quality results with OpenAI's latest models
-- **Testing**: Mocked responses for consistent integration tests
+## Testing
 
-## Documentation Structure
+- [Testing Guide](../scripts/test/TESTING.md) - Comprehensive testing documentation
+- [Database Fix Guide](../scripts/test/DATABASE_FIX.md) - Resolving database configuration issues
+- [Test Results](../scripts/test/TEST_RESULTS.md) - Latest test validation results
 
-- [AI Architecture](./ai/architecture.md) - How the AI system is structured
-- [Model Selection](./ai/models.md) - Which models are used and why
-- [Local Setup](./ai/local-setup.md) - Setting up Ollama for development
-- [API Reference](./ai/api-reference.md) - AI service methods and usage
+## Development
 
-## Quick Start
+- [Product Requirements](../tasks/PRD.md) - Product requirements and architecture overview
 
-### For Development (Local)
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+## Quick Links
 
-# Pull required models
-ollama pull llava:7b
-ollama pull mistral
-ollama pull nomic-embed-text
-
-# Start development server
-npm run dev
-```
-
-### For Production (Cloud)
-```bash
-# Set OpenAI API key
-export VITE_OPENAI_API_KEY=your-key-here
-
-# Build and deploy
-npm run build
-```
-
-## Key Features
-
-- **Video Frame Analysis**: Extract cooking steps from video frames
-- **Recipe Generation**: Create titles and descriptions from cooking steps  
-- **Semantic Search**: Find similar recipes using embeddings
-- **Social Media Detection**: Identify creator attribution from frames
+- **Performance Target**: 30 seconds for 60MB video ✅ Achieved (28.10s)
+- **Test Commands**: `node scripts/test/test-optimized-workflow.js <video-path>`
+- **Tech Stack**: React + TypeScript, Supabase, OpenAI, FFmpeg, pgvector
