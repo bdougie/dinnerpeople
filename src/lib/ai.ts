@@ -5,9 +5,19 @@ import type { RecipeSummary } from './prompt-utils';
 /**
  * Service that routes AI requests to either Ollama (in local development)
  * or OpenAI (in production) based on the environment.
+ * 
+ * TODO: Re-enable Ollama support once the main workflow is stable
  */
 class AIService {
-  private isLocalEnvironment(): boolean {
+  private useOllama(): boolean {
+    // Check if Ollama is explicitly enabled via environment variable
+    const ollamaEnabled = import.meta.env.VITE_USE_OLLAMA === 'true';
+    
+    // Only use Ollama if explicitly enabled AND in local environment
+    if (!ollamaEnabled) {
+      return false;
+    }
+    
     return window.location.hostname === 'localhost' || 
            window.location.hostname === '127.0.0.1' ||
            window.location.hostname.includes('local-credentialless.webcontainer-api.io');
@@ -15,7 +25,7 @@ class AIService {
 
   async analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
     // Use Ollama for local development, OpenAI for production
-    return this.isLocalEnvironment() 
+    return this.useOllama() 
       ? ollama.analyzeFrame(imageUrl, customPrompt)
       : openai.analyzeFrame(imageUrl, customPrompt);
   }
@@ -27,14 +37,14 @@ class AIService {
     imageUrl: string
   ): Promise<void> {
     // Use Ollama for local development, OpenAI for production
-    return this.isLocalEnvironment()
+    return this.useOllama()
       ? ollama.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl)
       : openai.storeFrameWithEmbedding(recipeId, timestamp, description, imageUrl);
   }
 
   async updateRecipeWithSummary(recipeId: string): Promise<RecipeSummary> {
     // Use Ollama for local development, OpenAI for production
-    return this.isLocalEnvironment()
+    return this.useOllama()
       ? ollama.updateRecipeWithSummary(recipeId)
       : openai.updateRecipeWithSummary(recipeId);
   }
@@ -71,7 +81,7 @@ class AIService {
     customPrompt: string
   ): Promise<RecipeSummary> {
     // Use Ollama for local development, OpenAI for production
-    return this.isLocalEnvironment()
+    return this.useOllama()
       ? ollama.generateRecipeSummaryWithCustomPrompt(cookingSteps, customPrompt)
       : openai.generateRecipeSummaryWithCustomPrompt(cookingSteps, customPrompt);
   }
