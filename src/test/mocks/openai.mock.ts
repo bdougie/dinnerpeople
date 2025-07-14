@@ -1,5 +1,4 @@
 import { vi } from 'vitest';
-import { OPENAI_EMBED_MODEL } from '../../lib/constants';
 
 // Mock OpenAI responses
 export const mockOpenAIResponses = {
@@ -8,7 +7,7 @@ export const mockOpenAIResponses = {
     title: 'Vegetable Stir Fry',
     description: 'A quick and healthy vegetable stir fry with fresh ingredients.'
   },
-  embedding: new Array(1536).fill(0).map((_, i) => Math.random())
+  embedding: new Array(1536).fill(0).map(() => Math.random())
 };
 
 // Create OpenAI mock

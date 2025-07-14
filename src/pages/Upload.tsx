@@ -6,31 +6,16 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { uploadVideo } from "../lib/storage";
 import { useNavigate } from "react-router-dom";
-import { supabase, formatAttribution } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
-import { extractFrames, uploadFrames } from "../lib/video";
-import {
-  storeFrameWithEmbedding,
-  updateRecipeWithSummary,
-} from "../lib/openai";
+import { extractFrames } from "../lib/video";
 import { ai } from "../lib/ai";
 import { processSocialHandles } from "../lib/prompt-utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-// Include this helper function at the top of your file
-function extractHandleFromUrl(url: string): string {
-  try {
-    const cleanUrl = url.endsWith("/") ? url.slice(0, -1) : url;
-    const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
-    const handle = parts[parts.length - 1];
-    return handle ? `@${handle}` : url;
-  } catch (e) {
-    return url;
-  }
-}
 
 interface UploadPreview {
   file: File;
@@ -108,7 +93,7 @@ export default function Upload() {
             step.id === "upload"
               ? "completed"
               : step.id ===
-                processingSteps.find((s) => s.status === "current")?.id
+                steps.find((s) => s.status === "current")?.id
               ? "failed"
               : step.status === "completed"
               ? "completed"
@@ -225,7 +210,7 @@ export default function Upload() {
     if (files.length) {
       await handleFiles(files);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,7 +220,7 @@ export default function Upload() {
         await handleFiles(Array.from(files));
       }
     },
-    []
+    [] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const generateThumbnail = async (file: File): Promise<string> => {
@@ -309,15 +294,17 @@ export default function Upload() {
 
       setIsUploading(false);
       console.log("[DEBUG] Upload state set to false");
-    } catch (err: any) {
+    } catch (err) {
       console.error("[DEBUG] Upload error:", err);
 
+      const errorMsg = err instanceof Error ? err.message : "Failed to process video";
+      
       // Check for payload too large error
       if (
-        err.message?.includes("payload too large") ||
-        err.message?.includes("request entity too large") ||
-        err.message?.includes("413") ||
-        err.message?.includes("size limit")
+        errorMsg.includes("payload too large") ||
+        errorMsg.includes("request entity too large") ||
+        errorMsg.includes("413") ||
+        errorMsg.includes("size limit")
       ) {
         const errorMessage =
           "Your video file is too large for upload. Please compress or resize it to a smaller file size.";
@@ -327,8 +314,8 @@ export default function Upload() {
           icon: "⚠️",
         });
       } else {
-        setError(err.message || "Failed to process video");
-        toast.error(err.message || "Failed to process video");
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
 
       setIsUploading(false);
@@ -493,9 +480,10 @@ export default function Upload() {
           });
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("[DEBUG] Error processing frames:", err);
-      toast.error(`Error processing video frames: ${err.message}`);
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Error processing video frames: ${errorMsg}`);
 
       // Update processing status to failed
       try {
@@ -503,14 +491,14 @@ export default function Upload() {
           .from("processing_queue")
           .update({
             status: "failed",
-            error: `Frame processing failed: ${err.message}`,
+            error: `Frame processing failed: ${errorMsg}`,
           })
           .eq("recipe_id", recipeId);
 
         // Update UI status
         setProcessingStatus({
           status: "failed",
-          error: `Frame processing failed: ${err.message}`,
+          error: `Frame processing failed: ${errorMsg}`,
         });
       } catch (updateErr) {
         console.error("[DEBUG] Error updating failure status:", updateErr);
@@ -611,8 +599,8 @@ export default function Upload() {
       if (updateError) throw updateError;
 
       navigate(`/my-recipes/${recipeId}`);
-    } catch (err: any) {
-      setError(err.message || "Failed to save recipe details");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save recipe details");
     }
   };
 

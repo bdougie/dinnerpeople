@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MDEditor from "@uiw/react-md-editor";
 import { RecipeTab } from "../types";
@@ -14,7 +14,7 @@ function extractHandleFromUrl(url: string): string {
     const parts = new URL(cleanUrl).pathname.split("/").filter(Boolean);
     const handle = parts[parts.length - 1];
     return handle ? `@${handle}` : url;
-  } catch (e) {
+  } catch {
     // If URL parsing fails, return the original string
     return url;
   }
@@ -31,8 +31,8 @@ function parseAttribution(attributionStr?: string): { handle?: string; original_
   if (!attributionStr) return undefined;
   try {
     return JSON.parse(attributionStr);
-  } catch (e) {
-    console.error('Error parsing attribution:', e);
+  } catch {
+    console.error('Error parsing attribution');
     return undefined;
   }
 }
@@ -153,8 +153,8 @@ export default function MyRecipes() {
           : null
       );
       setIsEditingDetails(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -184,8 +184,8 @@ export default function MyRecipes() {
         prev ? { ...prev, instructions: editedInstructions } : null
       );
       setIsEditing(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +199,7 @@ export default function MyRecipes() {
 
   useEffect(() => {
     fetchRecipes();
-  }, [activeTab]);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchRecipes = async () => {
     setIsLoading(true);
@@ -280,9 +280,9 @@ export default function MyRecipes() {
 
         setRecipes(formattedRecipes);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching recipes:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "An error occurred");
       setRecipes([]);
     } finally {
       setIsLoading(false);

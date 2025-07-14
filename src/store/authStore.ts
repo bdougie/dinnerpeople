@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import type { User } from '../types';
-import { useEffect } from 'react';
 
 interface AuthState {
   user: User | null;
@@ -72,8 +71,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           error: null 
         });
       }
-    } catch (error: any) {
-      set({ error: error.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      set({ error: errorMessage });
       throw error;
     } finally {
       set({ loading: false });
@@ -112,8 +112,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           error: null 
         });
       }
-    } catch (error: any) {
-      set({ error: error.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      set({ error: errorMessage });
       throw error;
     } finally {
       set({ loading: false });
@@ -125,8 +126,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       set({ user: null, error: null });
-    } catch (error: any) {
-      set({ error: error.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      set({ error: errorMessage });
       throw error;
     } finally {
       set({ loading: false });
@@ -140,8 +142,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
       if (error) throw error;
       set({ error: null });
-    } catch (error: any) {
-      set({ error: error.message });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      set({ error: errorMessage });
       throw error;
     } finally {
       set({ loading: false });

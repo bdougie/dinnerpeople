@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { supabase } from '../../../lib/supabase';
 
 export default async function handler(
   req: Request,

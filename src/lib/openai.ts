@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { supabase, formatAttribution } from './supabase';
+import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
 import { RecipeSummary } from './prompt-utils';
 import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL, OPENAI_EMBED_MODEL } from './constants';

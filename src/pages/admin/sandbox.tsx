@@ -53,7 +53,7 @@ const AdminSandbox: React.FC = () => {
 
   // Loading states
   const [isLoadingVideos, setIsLoadingVideos] = useState(false);
-  const [isLoadingFrames, setIsLoadingFrames] = useState(false);
+  const [isLoadingFrames, setIsLoadingFrames] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [isTestingFrame, setIsTestingFrame] = useState(false);
   const [isTestingRecipe, setIsTestingRecipe] = useState(false);
   const [isTestingSocial, setIsTestingSocial] = useState(false);
@@ -86,7 +86,7 @@ const AdminSandbox: React.FC = () => {
   useEffect(() => {
     fetchRecentVideos();
     fetchAvailableModels();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load frames when a video is selected
   useEffect(() => {
@@ -316,7 +316,7 @@ const AdminSandbox: React.FC = () => {
             }
           }
         }
-      } catch (parseError) {
+      } catch {
         // Silently continue if we can't parse the error details
       }
 
@@ -483,8 +483,21 @@ const AdminSandbox: React.FC = () => {
 
   function SemanticSearchTester() {
     const [query, setQuery] = useState("");
-    const [recipeResults, setRecipeResults] = useState<any[]>([]);
-    const [frameResults, setFrameResults] = useState<any[]>([]);
+    const [recipeResults, setRecipeResults] = useState<Array<{
+      id: string;
+      title: string;
+      description?: string;
+      thumbnail_url?: string;
+      similarity: number;
+    }>>([]);
+    const [frameResults, setFrameResults] = useState<Array<{
+      id: string;
+      recipe_id: string;
+      timestamp: number;
+      description?: string;
+      image_url?: string;
+      similarity: number;
+    }>>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [isInitializing, setIsInitializing] = useState(false);

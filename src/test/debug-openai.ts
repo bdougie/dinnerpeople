@@ -11,7 +11,7 @@ global.window = {
   location: {
     hostname: 'production.com' // Force production mode to use OpenAI
   }
-} as any;
+} as unknown as Window & typeof globalThis;
 
 import { ai } from '../lib/ai';
 

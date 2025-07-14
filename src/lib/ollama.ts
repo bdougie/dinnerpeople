@@ -12,12 +12,6 @@ interface OllamaResponse {
   done: boolean;
 }
 
-interface OllamaRequest {
-  model: string;
-  prompt: string;
-  stream?: boolean;
-  options?: Record<string, any>;
-}
 
 class OllamaAPI {
   private baseUrl: string;
@@ -66,7 +60,12 @@ class OllamaAPI {
     try {
       console.log(`[DEBUG] Sending completion request to Ollama with model ${this.model}`);
       
-      const requestBody: any = {
+      const requestBody: {
+        model: string;
+        prompt: string;
+        stream: boolean;
+        images?: string[];
+      } = {
         model: this.model,
         prompt,
         stream: false
@@ -333,7 +332,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
         return {
           title: title,
           description: 'A delicious recipe created from cooking video. ' + 
-                      response.substring(0, 100).replace(/["{}\[\]]/g, '') + '...'
+                      response.substring(0, 100).replace(/["{}[\]]/g, '') + '...'
         };
       }
     } catch (error) {
