@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Production configuration
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'];
+const SUPABASE_ANON_KEY = import.meta.env['VITE_SUPABASE_ANON_KEY'];
 
 // Create Supabase client
 export const supabase = createClient(
@@ -31,11 +31,11 @@ export function formatAttribution(handle?: string, videoUrl?: string): object {
   const attribution: Record<string, string> = {};
   
   if (handle && handle.trim() !== '') {
-    attribution.handle = handle.trim();
+    attribution['handle'] = handle.trim();
   }
   
   if (videoUrl && videoUrl.trim() !== '') {
-    attribution.original_url = videoUrl.trim();
+    attribution['original_url'] = videoUrl.trim();
   }
   
   // Return the object - Supabase will handle converting to JSONB

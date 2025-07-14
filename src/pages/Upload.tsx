@@ -253,6 +253,11 @@ export default function Upload() {
   const handleFiles = async (files: File[]) => {
     const file = files[0];
 
+    if (!file) {
+      setError("No file provided");
+      return;
+    }
+
     if (!file.type.startsWith("video/")) {
       setError("Please upload a video file");
       return;
@@ -360,6 +365,7 @@ export default function Upload() {
 
       for (let i = 0; i < frames.length; i++) {
         const frame = frames[i];
+        if (!frame) continue;
 
         // Upload individual frame
         const path = `${userData.user.id}/${recipeId}/${frame.timestamp}.jpg`;

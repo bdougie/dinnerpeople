@@ -220,9 +220,11 @@ export async function extractSocialHandles(
       if (result.includes('SOCIAL:') && !result.includes('SOCIAL:none')) {
         const handleMatch = result.match(/SOCIAL:([^:]+):(.+)/);
         if (handleMatch && handleMatch.length >= 3) {
-          const platform = handleMatch[1].trim();
-          const username = handleMatch[2].trim();
-          socialHandles.push(`${platform}:${username}`);
+          const platform = handleMatch[1]?.trim();
+          const username = handleMatch[2]?.trim();
+          if (platform && username) {
+            socialHandles.push(`${platform}:${username}`);
+          }
         }
       }
     }
@@ -282,7 +284,12 @@ export async function processSocialHandles(
       }
 
       // Format the first handle as a proper URL and update the recipe attribution
-      const [platform, username] = socialHandles[0].split(':');
+      const firstHandle = socialHandles[0];
+      if (!firstHandle) return socialHandles;
+      
+      const parts = firstHandle.split(':');
+      const platform = parts[0] || '';
+      const username = parts[1] || '';
       const formattedUrl = formatSocialMediaUrl(platform, username);
 
       const attribution = {

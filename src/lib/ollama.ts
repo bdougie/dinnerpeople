@@ -78,7 +78,7 @@ class OllamaAPI {
           ? imageBase64.split('base64,')[1] 
           : imageBase64;
           
-        requestBody.images = [base64Data];
+        requestBody.images = [base64Data || ''];
       }
       
       const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -430,9 +430,11 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       if (response.includes('SOCIAL:') && !response.includes('SOCIAL:none')) {
         const handleMatch = response.match(/SOCIAL:([^:]+):(.+)/);
         if (handleMatch && handleMatch.length >= 3) {
-          const platform = handleMatch[1].trim();
-          const username = handleMatch[2].trim();
-          socialHandles.push(`${platform}:${username}`);
+          const platform = handleMatch[1]?.trim();
+          const username = handleMatch[2]?.trim();
+          if (platform && username) {
+            socialHandles.push(`${platform}:${username}`);
+          }
         }
       }
       

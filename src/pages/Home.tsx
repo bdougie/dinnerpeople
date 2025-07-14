@@ -154,9 +154,12 @@ export default function Home() {
       setInteractions((prev) => ({
         ...prev,
         [recipeId]: {
-          ...prev[recipeId],
-          [type === "like" ? "liked" : "saved"]:
-            !prev[recipeId]?.[type === "like" ? "liked" : "saved"],
+          liked: type === "like" 
+            ? !(prev[recipeId]?.liked ?? false)
+            : (prev[recipeId]?.liked ?? false),
+          saved: type === "save" 
+            ? !(prev[recipeId]?.saved ?? false)
+            : (prev[recipeId]?.saved ?? false),
         },
       }));
     }

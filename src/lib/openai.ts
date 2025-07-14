@@ -5,7 +5,7 @@ import { RecipeSummary } from './prompt-utils';
 import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL, OPENAI_EMBED_MODEL } from './constants';
 
 const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  apiKey: import.meta.env['VITE_OPENAI_API_KEY'],
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
@@ -48,7 +48,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       encoding_format: "float"
     });
     
-    return response.data[0].embedding;
+    return response.data[0]?.embedding || [];
   } catch (error) {
     console.error('Error generating embedding:', error);
     throw error;
@@ -147,7 +147,7 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
  * Generate a recipe summary with a custom prompt
  */
 export async function generateRecipeSummaryWithCustomPrompt(
-  cookingSteps: string,
+  _cookingSteps: string,
   customPrompt: string
 ): Promise<PromptUtils.RecipeSummary> {
   try {
