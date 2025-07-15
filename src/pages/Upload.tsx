@@ -15,6 +15,8 @@ import { extractFrames } from "../lib/video";
 import { ai } from "../lib/ai";
 import { processSocialHandles } from "../lib/prompt-utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useUploadProgress, formatBytes, formatSpeed, formatTimeRemaining } from "../hooks/useUploadProgress";
+import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploadWithRealtimeProgress";
 
 
 interface UploadPreview {
@@ -48,6 +50,10 @@ export default function Upload() {
   const [processingStatus, setProcessingStatus] =
     useState<ProcessingStatus | null>(null);
   const navigate = useNavigate();
+  
+  // Upload progress tracking
+  const uploadProgress = useUploadProgress();
+  const [uploadChannel, setUploadChannel] = useState<RealtimeChannel | null>(null);
 
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
     { id: "upload", label: "Uploading video", status: "waiting" },
@@ -263,8 +269,8 @@ export default function Upload() {
       return;
     }
 
-    if (file.size > 500 * 1024 * 1024) {
-      setError("File size must be less than 500MB");
+    if (file.size > 200 * 1024 * 1024) {
+      setError("File size must be less than 200MB");
       return;
     }
 
@@ -277,10 +283,27 @@ export default function Upload() {
 
       console.log("[DEBUG] Starting video upload to Supabase");
       setIsUploading(true);
+      
+      // Start upload progress tracking
+      uploadProgress.startUpload(file.size);
+      
       const result = await uploadVideo(file, thumbnailUrl); // Pass the thumbnail to the upload function
       console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
+      
+      // Subscribe to upload progress updates
+      const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
+        uploadProgress.updateProgress(data.bytes_uploaded);
+        
+        if (data.status === 'completed') {
+          uploadProgress.completeUpload();
+        } else if (data.status === 'failed') {
+          uploadProgress.resetProgress();
+          setError(data.error || 'Upload failed');
+        }
+      });
+      setUploadChannel(channel);
 
       // Set initial processing status from upload result to avoid waiting for realtime updates
       if (result.processingStatus) {
@@ -617,6 +640,13 @@ export default function Upload() {
     setError(null);
     setRecipeId(null);
     setProcessingStatus(null);
+    uploadProgress.resetProgress();
+    
+    // Clean up upload channel
+    if (uploadChannel) {
+      supabase.removeChannel(uploadChannel);
+      setUploadChannel(null);
+    }
   };
 
   const renderProcessingStatus = () => {
@@ -667,6 +697,30 @@ export default function Upload() {
                               </span>
                             )}
                         </p>
+
+                        {/* Add progress bar and details for upload step */}
+                        {step.id === "upload" && step.status === "current" && (
+                          <>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-sm text-white/80">
+                                <span>{formatBytes(uploadProgress.progress.bytesUploaded)} of {formatBytes(uploadProgress.progress.totalBytes)}</span>
+                                <span>{uploadProgress.progress.percentage.toFixed(0)}%</span>
+                              </div>
+                              <div className="w-full bg-white/10 rounded-full h-2">
+                                <div
+                                  className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${uploadProgress.progress.percentage}%`,
+                                  }}
+                                ></div>
+                              </div>
+                              <div className="flex justify-between text-xs text-white/60">
+                                <span>{formatSpeed(uploadProgress.progress.speed)}</span>
+                                <span>{formatTimeRemaining(uploadProgress.progress.timeRemaining)}</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         {/* Add progress bar for frames step */}
                         {step.id === "frames" &&
@@ -878,7 +932,7 @@ export default function Upload() {
               </label>
             </p>
             <p className="mt-2 text-sm tracking-wider text-gray-500 dark:text-gray-400">
-              Supported formats: MP4, MOV, AVI (max 500MB)
+              Supported formats: MP4, MOV, AVI (max 200MB)
             </p>
           </div>
 
