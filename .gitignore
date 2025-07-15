@@ -24,5 +24,6 @@ dist-ssr
 *.sw?
 
 .env
+
 .mcp.json
-upload-test
+upload-test/
