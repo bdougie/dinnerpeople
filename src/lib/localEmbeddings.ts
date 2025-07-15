@@ -1,14 +1,14 @@
-import { pipeline } from '@xenova/transformers';
+import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
 
 // Model configuration
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-let embeddingPipeline: any = null;
+let embeddingPipeline: FeatureExtractionPipeline | null = null;
 
 /**
  * Initialize the embedding model
  * This loads the model on first use and caches it for subsequent calls
  */
-async function getEmbeddingPipeline(): Promise<any> {
+async function getEmbeddingPipeline(): Promise<FeatureExtractionPipeline> {
   if (!embeddingPipeline) {
     console.log('Loading embedding model...');
     embeddingPipeline = await pipeline('feature-extraction', MODEL_NAME, {
