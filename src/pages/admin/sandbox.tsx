@@ -4,6 +4,7 @@ import { PROMPTS } from "../../lib/prompt-utils";
 import { generateEmbedding } from "../../lib/openai";
 import { initializeSearchFunctions } from "../../lib/search";
 import { ollama } from "../../lib/ollama";
+import { testLocalEmbeddings } from "../../lib/testLocalEmbeddings";
 
 interface VideoInfo {
   id: string;
@@ -504,6 +505,8 @@ const AdminSandbox: React.FC = () => {
     const [error, setError] = useState("");
     const [isInitializing, setIsInitializing] = useState(false);
     const [initMessage, setInitMessage] = useState("");
+    const [isTestingEmbeddings, setIsTestingEmbeddings] = useState(false);
+    const [embeddingTestMessage, setEmbeddingTestMessage] = useState("");
 
     const handleSearch = async () => {
       if (!query.trim()) {
@@ -552,17 +555,47 @@ const AdminSandbox: React.FC = () => {
       }
     };
 
+    const handleTestEmbeddings = async () => {
+      setIsTestingEmbeddings(true);
+      setEmbeddingTestMessage("");
+
+      try {
+        console.log("Starting local embeddings test...");
+        const result = await testLocalEmbeddings();
+        
+        if (result.success) {
+          setEmbeddingTestMessage("✅ Local embeddings test passed! Check console for details.");
+        } else {
+          setEmbeddingTestMessage(`❌ Test failed: ${result.error}`);
+        }
+      } catch (err) {
+        console.error("Error testing embeddings:", err);
+        setEmbeddingTestMessage(`❌ Error: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setIsTestingEmbeddings(false);
+      }
+    };
+
     return (
       <div className="p-6 border rounded-lg bg-white shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Semantic Search Testing</h2>
-          <button
-            onClick={handleInitFunctions}
-            disabled={isInitializing}
-            className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50"
-          >
-            {isInitializing ? "Initializing..." : "Initialize Search Functions"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleTestEmbeddings}
+              disabled={isTestingEmbeddings}
+              className="px-3 py-1 text-sm bg-purple-200 text-purple-800 rounded hover:bg-purple-300 disabled:opacity-50"
+            >
+              {isTestingEmbeddings ? "Testing..." : "Test Local Embeddings"}
+            </button>
+            <button
+              onClick={handleInitFunctions}
+              disabled={isInitializing}
+              className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
+              {isInitializing ? "Initializing..." : "Initialize Search Functions"}
+            </button>
+          </div>
         </div>
 
         {initMessage && (
@@ -574,6 +607,18 @@ const AdminSandbox: React.FC = () => {
             }`}
           >
             {initMessage}
+          </div>
+        )}
+
+        {embeddingTestMessage && (
+          <div
+            className={`mb-4 p-3 rounded text-sm ${
+              embeddingTestMessage.includes("❌")
+                ? "bg-red-100 text-red-700"
+                : "bg-green-100 text-green-700"
+            }`}
+          >
+            {embeddingTestMessage}
           </div>
         )}
 

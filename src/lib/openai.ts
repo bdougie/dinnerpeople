@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
 import { RecipeSummary } from './prompt-utils';
-import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL, OPENAI_EMBED_MODEL } from './constants';
+import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL } from './constants';
+import { generateEmbedding as generateLocalEmbedding } from './localEmbeddings';
 
 const openai = new OpenAI({
   apiKey: import.meta.env['VITE_OPENAI_API_KEY'],
@@ -42,13 +43,8 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const response = await openai.embeddings.create({
-      model: OPENAI_EMBED_MODEL,
-      input: text,
-      encoding_format: "float"
-    });
-    
-    return response.data[0]?.embedding || [];
+    // Use local embeddings instead of OpenAI
+    return await generateLocalEmbedding(text);
   } catch (error) {
     console.error('Error generating embedding:', error);
     throw error;
