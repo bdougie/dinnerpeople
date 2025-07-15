@@ -6,17 +6,29 @@ vi.mock('openai', () => ({
   default: vi.fn(() => createOpenAIMock())
 }));
 
+// Mock localEmbeddings to avoid ONNX runtime issues in tests
+vi.mock('./localEmbeddings', () => ({
+  generateEmbedding: vi.fn(() => Promise.resolve(new Array(384).fill(0.1))),
+  generateBatchEmbeddings: vi.fn((texts) => Promise.resolve(texts.map(() => new Array(384).fill(0.1)))),
+  preloadModel: vi.fn(() => Promise.resolve()),
+  findSimilar: vi.fn(() => Promise.resolve([]))
+}));
+
+// Create mock functions that can be tracked
+const mockInsert = vi.fn(() => ({ error: null }));
+const mockFrom = vi.fn(() => ({
+  insert: mockInsert,
+  select: vi.fn(() => ({
+    eq: vi.fn(() => ({
+      single: vi.fn(() => ({ data: { user_id: 'test-user' }, error: null }))
+    }))
+  }))
+}));
+
 // Mock supabase
 vi.mock('./supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      insert: vi.fn(() => ({ error: null })),
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn(() => ({ data: { user_id: 'test-user' }, error: null }))
-        }))
-      }))
-    })),
+    from: mockFrom,
     auth: {
       getUser: vi.fn(() => ({ data: { user: { id: 'test-user' } } }))
     }
@@ -54,8 +66,8 @@ describe('AI Service Integration Tests', () => {
       );
       
       // Verify supabase was called
-      const { supabase } = await import('./supabase');
-      expect(supabase.from).toHaveBeenCalledWith('video_frames');
+      expect(mockFrom).toHaveBeenCalledWith('video_frames');
+      expect(mockInsert).toHaveBeenCalled();
     });
 
     it('should process multiple video frames', async () => {
@@ -68,9 +80,9 @@ describe('AI Service Integration Tests', () => {
       
       await ai.processVideoFrames('video-123', frames);
       
-      // Should process both frames
-      const { supabase } = await import('./supabase');
-      expect(supabase.from).toHaveBeenCalledTimes(2);
+      // Should process both frames (mockFrom is called once per frame)
+      expect(mockFrom).toHaveBeenCalledWith('video_frames');
+      expect(mockInsert).toHaveBeenCalledTimes(2);
     });
 
     it('should generate recipe summary with custom prompt', async () => {
