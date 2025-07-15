@@ -19,6 +19,7 @@ import { useUploadProgress, formatBytes, formatSpeed, formatTimeRemaining } from
 import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploadWithRealtimeProgress";
 import { useVideoCompression, formatCompressionStats } from "../hooks/useVideoCompression";
 import { isCompressionNeeded } from "../lib/videoCompression";
+import { useUploadContext, useActiveUpload } from "../contexts/UploadContext";
 
 
 interface UploadPreview {
@@ -59,6 +60,10 @@ export default function Upload() {
   
   // Video compression
   const compression = useVideoCompression();
+  
+  // Upload context for background uploads
+  const { addBackgroundUpload, updateUploadProgress: updateContextProgress } = useUploadContext();
+  const activeUpload = useActiveUpload();
 
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
     { id: "compress", label: "Optimizing video", status: "waiting" },
@@ -69,6 +74,25 @@ export default function Upload() {
 
   const [processingFrames, setProcessingFrames] = useState(false);
   const [frameProgress, setFrameProgress] = useState({ current: 0, total: 0 });
+  
+  // Restore active upload if returning to page
+  useEffect(() => {
+    if (activeUpload && !recipeId) {
+      setRecipeId(activeUpload.recipeId);
+      setProcessingStatus({
+        status: activeUpload.status === 'uploading' ? 'pending' : 
+                activeUpload.status === 'processing' ? 'processing' : 
+                activeUpload.status === 'completed' ? 'completed' : 'failed',
+        error: activeUpload.error
+      });
+      
+      // Restore progress
+      if (activeUpload.progress) {
+        uploadProgress.startUpload(activeUpload.fileSize);
+        uploadProgress.updateProgress(activeUpload.progress.bytesUploaded);
+      }
+    }
+  }, [activeUpload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (compression.isCompressing) {
@@ -350,15 +374,35 @@ export default function Upload() {
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
       
+      // Add to background uploads
+      addBackgroundUpload({
+        recipeId: result.recipeId,
+        fileName: file.name,
+        fileSize: fileToUpload.size,
+        progress: uploadProgress.progress,
+        status: 'uploading',
+        startedAt: new Date(),
+      });
+      
       // Subscribe to upload progress updates
       const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
         uploadProgress.updateProgress(data.bytes_uploaded);
+        
+        // Update context progress
+        updateContextProgress(result.recipeId, {
+          progress: uploadProgress.progress,
+          status: data.status === 'completed' ? 'processing' : 'uploading',
+        });
         
         if (data.status === 'completed') {
           uploadProgress.completeUpload();
         } else if (data.status === 'failed') {
           uploadProgress.resetProgress();
           setError(data.error || 'Upload failed');
+          updateContextProgress(result.recipeId, {
+            status: 'failed',
+            error: data.error,
+          });
         }
       });
       setUploadChannel(channel);
@@ -547,6 +591,14 @@ export default function Upload() {
         status: "completed",
       });
 
+      // Update background upload context if it exists
+      if (activeUpload) {
+        updateContextProgress(recipeId, {
+          status: 'completed',
+          completedAt: new Date()
+        });
+      }
+
       toast.success("Video processing completed successfully!");
 
       // Fetch the generated title and description to update the UI
@@ -587,6 +639,15 @@ export default function Upload() {
           status: "failed",
           error: `Frame processing failed: ${errorMsg}`,
         });
+
+        // Update background upload context if it exists
+        if (activeUpload) {
+          updateContextProgress(recipeId, {
+            status: 'failed',
+            error: `Frame processing failed: ${errorMsg}`,
+            completedAt: new Date()
+          });
+        }
       } catch (updateErr) {
         console.error("[DEBUG] Error updating failure status:", updateErr);
       }
@@ -715,6 +776,19 @@ export default function Upload() {
       { id: "analysis", label: "Analyzing content", status: "waiting" },
     ]);
   };
+  
+  const continueInBackground = () => {
+    if (recipeId) {
+      // Show success message
+      toast.success("Upload continuing in background", {
+        duration: 3000,
+        icon: "🚀",
+      });
+      
+      // Navigate away
+      navigate("/my-recipes");
+    }
+  };
 
   const renderProcessingStatus = () => {
     return (
@@ -839,6 +913,21 @@ export default function Upload() {
                   </div>
                 ))}
               </div>
+
+              {/* Continue in Background button */}
+              {processingStatus?.status === "processing" && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={continueInBackground}
+                    className="px-6 py-2 text-sm font-medium tracking-wider uppercase text-white/70 hover:text-white border border-white/20 hover:bg-white/10 transition-colors rounded-full"
+                  >
+                    Continue in Background
+                  </button>
+                  <p className="mt-2 text-xs text-white/50">
+                    Your video will continue processing while you browse
+                  </p>
+                </div>
+              )}
 
               {processingStatus?.status === "failed" && (
                 <div className="mt-8 text-center">
