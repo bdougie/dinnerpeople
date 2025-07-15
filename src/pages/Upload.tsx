@@ -15,6 +15,11 @@ import { extractFrames } from "../lib/video";
 import { ai } from "../lib/ai";
 import { processSocialHandles } from "../lib/prompt-utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useUploadProgress, formatBytes, formatSpeed, formatTimeRemaining } from "../hooks/useUploadProgress";
+import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploadWithRealtimeProgress";
+import { useVideoCompression, formatCompressionStats } from "../hooks/useVideoCompression";
+import { isCompressionNeeded } from "../lib/videoCompression";
+import { useUploadContext, useActiveUpload } from "../contexts/UploadContext";
 
 
 interface UploadPreview {
@@ -48,8 +53,20 @@ export default function Upload() {
   const [processingStatus, setProcessingStatus] =
     useState<ProcessingStatus | null>(null);
   const navigate = useNavigate();
+  
+  // Upload progress tracking
+  const uploadProgress = useUploadProgress();
+  const [uploadChannel, setUploadChannel] = useState<RealtimeChannel | null>(null);
+  
+  // Video compression
+  const compression = useVideoCompression();
+  
+  // Upload context for background uploads
+  const { addBackgroundUpload, updateUploadProgress: updateContextProgress } = useUploadContext();
+  const activeUpload = useActiveUpload();
 
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
+    { id: "compress", label: "Optimizing video", status: "waiting" },
     { id: "upload", label: "Uploading video", status: "waiting" },
     { id: "frames", label: "Processing frames", status: "waiting" },
     { id: "analysis", label: "Analyzing content", status: "waiting" },
@@ -57,13 +74,40 @@ export default function Upload() {
 
   const [processingFrames, setProcessingFrames] = useState(false);
   const [frameProgress, setFrameProgress] = useState({ current: 0, total: 0 });
+  
+  // Restore active upload if returning to page
+  useEffect(() => {
+    if (activeUpload && !recipeId) {
+      setRecipeId(activeUpload.recipeId);
+      setProcessingStatus({
+        status: activeUpload.status === 'uploading' ? 'pending' : 
+                activeUpload.status === 'processing' ? 'processing' : 
+                activeUpload.status === 'completed' ? 'completed' : 'failed',
+        error: activeUpload.error
+      });
+      
+      // Restore progress
+      if (activeUpload.progress) {
+        uploadProgress.startUpload(activeUpload.fileSize);
+        uploadProgress.updateProgress(activeUpload.progress.bytesUploaded);
+      }
+    }
+  }, [activeUpload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isUploading) {
+    if (compression.isCompressing) {
       setProcessingSteps((steps) =>
         steps.map((step) => ({
           ...step,
-          status: step.id === "upload" ? "current" : "waiting",
+          status: step.id === "compress" ? "current" : "waiting",
+        }))
+      );
+    } else if (isUploading) {
+      setProcessingSteps((steps) =>
+        steps.map((step) => ({
+          ...step,
+          status: step.id === "upload" ? "current" : 
+                 step.id === "compress" ? "completed" : "waiting",
         }))
       );
     } else if (processingStatus?.status === "processing") {
@@ -71,7 +115,7 @@ export default function Upload() {
         steps.map((step) => ({
           ...step,
           status:
-            step.id === "upload"
+            step.id === "upload" || step.id === "compress"
               ? "completed"
               : step.id === "frames"
               ? "current"
@@ -90,7 +134,7 @@ export default function Upload() {
         steps.map((step) => ({
           ...step,
           status:
-            step.id === "upload"
+            step.id === "upload" || step.id === "compress"
               ? "completed"
               : step.id ===
                 steps.find((s) => s.status === "current")?.id
@@ -101,7 +145,7 @@ export default function Upload() {
         }))
       );
     }
-  }, [isUploading, processingStatus]);
+  }, [compression.isCompressing, isUploading, processingStatus]);
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
@@ -263,8 +307,8 @@ export default function Upload() {
       return;
     }
 
-    if (file.size > 500 * 1024 * 1024) {
-      setError("File size must be less than 500MB");
+    if (file.size > 200 * 1024 * 1024) {
+      setError("File size must be less than 200MB");
       return;
     }
 
@@ -274,13 +318,94 @@ export default function Upload() {
       console.log("[DEBUG] Thumbnail generated successfully");
 
       setPreview({ file, thumbnailUrl });
+      
+      // Check if compression is needed
+      let fileToUpload = file;
+      if (isCompressionNeeded(file)) {
+        console.log("[DEBUG] Starting video compression");
+        setProcessingSteps((steps) =>
+          steps.map((step) => ({
+            ...step,
+            status: step.id === "compress" ? "current" : "waiting",
+          }))
+        );
+        
+        try {
+          fileToUpload = await compression.compress(file);
+          console.log("[DEBUG] Compression completed:", formatCompressionStats(file.size, fileToUpload.size));
+          
+          // Update compression step to completed
+          setProcessingSteps((steps) =>
+            steps.map((step) => ({
+              ...step,
+              status: step.id === "compress" ? "completed" : step.status,
+            }))
+          );
+        } catch (compressionError) {
+          console.error("[DEBUG] Compression failed, using original file:", compressionError);
+          // Continue with original file if compression fails
+          toast.error("Video optimization failed, uploading original file", {
+            duration: 4000,
+          });
+        }
+      } else {
+        // Skip compression step if not needed
+        setProcessingSteps((steps) =>
+          steps.filter((step) => step.id !== "compress")
+        );
+      }
 
       console.log("[DEBUG] Starting video upload to Supabase");
       setIsUploading(true);
-      const result = await uploadVideo(file, thumbnailUrl); // Pass the thumbnail to the upload function
+      
+      // Update upload step to current
+      setProcessingSteps((steps) =>
+        steps.map((step) => ({
+          ...step,
+          status: step.id === "upload" ? "current" : step.id === "compress" ? "completed" : step.status,
+        }))
+      );
+      
+      // Start upload progress tracking
+      uploadProgress.startUpload(fileToUpload.size);
+      
+      const result = await uploadVideo(fileToUpload, thumbnailUrl); // Pass the compressed file to upload
       console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
+      
+      // Add to background uploads
+      addBackgroundUpload({
+        recipeId: result.recipeId,
+        fileName: file.name,
+        fileSize: fileToUpload.size,
+        progress: uploadProgress.progress,
+        status: 'uploading',
+        startedAt: new Date(),
+      });
+      
+      // Subscribe to upload progress updates
+      const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
+        uploadProgress.updateProgress(data.bytes_uploaded);
+        
+        // Update context progress
+        updateContextProgress(result.recipeId, {
+          progress: uploadProgress.progress,
+          status: data.status === 'completed' ? 'processing' : 'uploading',
+        });
+        
+        if (data.status === 'completed') {
+          uploadProgress.completeUpload();
+        } else if (data.status === 'failed') {
+          uploadProgress.resetProgress();
+          setError(data.error || 'Upload failed');
+          updateContextProgress(result.recipeId, {
+            status: 'failed',
+            error: data.error,
+          });
+        }
+      });
+      setUploadChannel(channel);
 
       // Set initial processing status from upload result to avoid waiting for realtime updates
       if (result.processingStatus) {
@@ -466,6 +591,14 @@ export default function Upload() {
         status: "completed",
       });
 
+      // Update background upload context if it exists
+      if (activeUpload) {
+        updateContextProgress(recipeId, {
+          status: 'completed',
+          completedAt: new Date()
+        });
+      }
+
       toast.success("Video processing completed successfully!");
 
       // Fetch the generated title and description to update the UI
@@ -506,6 +639,15 @@ export default function Upload() {
           status: "failed",
           error: `Frame processing failed: ${errorMsg}`,
         });
+
+        // Update background upload context if it exists
+        if (activeUpload) {
+          updateContextProgress(recipeId, {
+            status: 'failed',
+            error: `Frame processing failed: ${errorMsg}`,
+            completedAt: new Date()
+          });
+        }
       } catch (updateErr) {
         console.error("[DEBUG] Error updating failure status:", updateErr);
       }
@@ -617,6 +759,35 @@ export default function Upload() {
     setError(null);
     setRecipeId(null);
     setProcessingStatus(null);
+    uploadProgress.resetProgress();
+    compression.reset();
+    
+    // Clean up upload channel
+    if (uploadChannel) {
+      supabase.removeChannel(uploadChannel);
+      setUploadChannel(null);
+    }
+    
+    // Reset processing steps
+    setProcessingSteps([
+      { id: "compress", label: "Optimizing video", status: "waiting" },
+      { id: "upload", label: "Uploading video", status: "waiting" },
+      { id: "frames", label: "Processing frames", status: "waiting" },
+      { id: "analysis", label: "Analyzing content", status: "waiting" },
+    ]);
+  };
+  
+  const continueInBackground = () => {
+    if (recipeId) {
+      // Show success message
+      toast.success("Upload continuing in background", {
+        duration: 3000,
+        icon: "🚀",
+      });
+      
+      // Navigate away
+      navigate("/my-recipes");
+    }
   };
 
   const renderProcessingStatus = () => {
@@ -668,6 +839,55 @@ export default function Upload() {
                             )}
                         </p>
 
+                        {/* Add progress bar for compression step */}
+                        {step.id === "compress" && step.status === "current" && (
+                          <>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-sm text-white/80">
+                                <span>Optimizing for faster upload...</span>
+                                <span>{compression.progress}%</span>
+                              </div>
+                              <div className="w-full bg-white/10 rounded-full h-2">
+                                <div
+                                  className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${compression.progress}%`,
+                                  }}
+                                ></div>
+                              </div>
+                              {compression.originalSize > 0 && (
+                                <div className="text-xs text-white/60">
+                                  Original size: {formatBytes(compression.originalSize)}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Add progress bar and details for upload step */}
+                        {step.id === "upload" && step.status === "current" && (
+                          <>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-sm text-white/80">
+                                <span>{formatBytes(uploadProgress.progress.bytesUploaded)} of {formatBytes(uploadProgress.progress.totalBytes)}</span>
+                                <span>{uploadProgress.progress.percentage.toFixed(0)}%</span>
+                              </div>
+                              <div className="w-full bg-white/10 rounded-full h-2">
+                                <div
+                                  className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${uploadProgress.progress.percentage}%`,
+                                  }}
+                                ></div>
+                              </div>
+                              <div className="flex justify-between text-xs text-white/60">
+                                <span>{formatSpeed(uploadProgress.progress.speed)}</span>
+                                <span>{formatTimeRemaining(uploadProgress.progress.timeRemaining)}</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
                         {/* Add progress bar for frames step */}
                         {step.id === "frames" &&
                           step.status === "current" &&
@@ -693,6 +913,21 @@ export default function Upload() {
                   </div>
                 ))}
               </div>
+
+              {/* Continue in Background button */}
+              {processingStatus?.status === "processing" && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={continueInBackground}
+                    className="px-6 py-2 text-sm font-medium tracking-wider uppercase text-white/70 hover:text-white border border-white/20 hover:bg-white/10 transition-colors rounded-full"
+                  >
+                    Continue in Background
+                  </button>
+                  <p className="mt-2 text-xs text-white/50">
+                    Your video will continue processing while you browse
+                  </p>
+                </div>
+              )}
 
               {processingStatus?.status === "failed" && (
                 <div className="mt-8 text-center">
@@ -878,7 +1113,7 @@ export default function Upload() {
               </label>
             </p>
             <p className="mt-2 text-sm tracking-wider text-gray-500 dark:text-gray-400">
-              Supported formats: MP4, MOV, AVI (max 500MB)
+              Supported formats: MP4, MOV, AVI (max 200MB)
             </p>
           </div>
 
