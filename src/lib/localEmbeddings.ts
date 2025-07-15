@@ -1,14 +1,14 @@
-import { pipeline, Pipeline } from '@xenova/transformers';
+import { pipeline } from '@xenova/transformers';
 
 // Model configuration
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-let embeddingPipeline: Pipeline | null = null;
+let embeddingPipeline: any = null;
 
 /**
  * Initialize the embedding model
  * This loads the model on first use and caches it for subsequent calls
  */
-async function getEmbeddingPipeline(): Promise<Pipeline> {
+async function getEmbeddingPipeline(): Promise<any> {
   if (!embeddingPipeline) {
     console.log('Loading embedding model...');
     embeddingPipeline = await pipeline('feature-extraction', MODEL_NAME, {
@@ -34,7 +34,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     });
     
     // Convert to regular array
-    const embedding = Array.from(output.data);
+    const embedding = Array.from(output.data) as number[];
     
     return embedding;
   } catch (error) {
@@ -67,7 +67,7 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
       
       // Convert to arrays and add to results
       outputs.forEach(output => {
-        embeddings.push(Array.from(output.data));
+        embeddings.push(Array.from(output.data) as number[]);
       });
     }
     
@@ -91,9 +91,9 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   let normB = 0;
   
   for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+    dotProduct += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
   }
   
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
@@ -115,7 +115,7 @@ export async function findSimilar(
   
   // Calculate similarities
   const similarities = textEmbeddings.map((embedding, index) => ({
-    text: texts[index],
+    text: texts[index]!,
     similarity: cosineSimilarity(queryEmbedding, embedding),
     index,
   }));
