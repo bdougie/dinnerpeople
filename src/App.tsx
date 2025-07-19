@@ -8,6 +8,8 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import { useAuthStore } from "./store/authStore";
 import AdminSandbox from "./pages/admin/sandbox";
+import { UploadProvider } from "./contexts/UploadContext";
+import { UploadStatusIndicator } from "./components/UploadStatusIndicator";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -29,25 +31,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Home />} />
-          <Route path="my-recipes" element={<MyRecipes />} />
-          <Route path="upload" element={<Upload />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="admin/sandbox" element={<AdminSandbox />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <UploadProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Home />} />
+            <Route path="my-recipes" element={<MyRecipes />} />
+            <Route path="upload" element={<Upload />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="admin/sandbox" element={<AdminSandbox />} />
+          </Route>
+        </Routes>
+        <UploadStatusIndicator />
+      </BrowserRouter>
+    </UploadProvider>
   );
 }
 

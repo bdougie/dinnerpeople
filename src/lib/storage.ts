@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadVideoWithRealtimeProgress } from './uploadWithRealtimeProgress';
 
 export interface UploadResult {
   recipeId: string;
@@ -60,50 +61,15 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
     throw queueError;
   }
 
-  // Now upload the actual video file to storage
-  console.log('[DEBUG] Uploading video file to storage');
+  // Now upload the actual video file to storage with progress tracking
+  console.log('[DEBUG] Uploading video file to storage with progress tracking');
   const filePath = `${userId}/${recipeId}.mp4`;
   
   try {
-    const { data: uploadData, error: storageError } = await supabase.storage
-      .from('videos')
-      .upload(filePath, file);
-
-    console.log('[DEBUG] Storage upload response:', { data: uploadData, error: storageError });
+    // Use the enhanced upload function with realtime progress
+    await uploadVideoWithRealtimeProgress(file, filePath, 'videos', recipeId);
     
-    if (storageError) {
-      console.error('[DEBUG] Storage upload error:', storageError);
-      
-      // Check for payload size issues
-      if (
-        storageError.message?.includes("payload too large") ||
-        storageError.message?.includes("request entity too large") ||
-        storageError.message?.includes("413") ||
-        storageError.message?.includes("size limit")
-      ) {
-        // Update processing queue with more specific error
-        await supabase
-          .from('processing_queue')
-          .update({ 
-            status: 'failed',
-            error: `Video file is too large. Please compress or resize your video to a smaller file size.`
-          })
-          .eq('recipe_id', recipeId);
-        
-        throw new Error("Video file is too large. Please compress or resize your video to a smaller file size.");
-      } else {
-        // Update the status to failed with generic error
-        await supabase
-          .from('processing_queue')
-          .update({ 
-            status: 'failed',
-            error: `Failed to upload video: ${storageError.message}`
-          })
-          .eq('recipe_id', recipeId);
-        
-        throw storageError;
-      }
-    }
+    console.log('[DEBUG] Storage upload completed');
 
     // Get the proper public URL with the full path
     const { data: urlData } = supabase.storage
