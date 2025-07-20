@@ -158,17 +158,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       set({ loading: true, error: null, successMessage: null });
       
-      console.log('[DEBUG] Attempting password reset for:', email);
-      console.log('[DEBUG] Redirect URL:', `${window.location.origin}/auth/reset-password`);
       
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
       
-      console.log('[DEBUG] Reset password response:', { data, error });
       
       if (error) {
-        console.error('[DEBUG] Reset password error:', error);
         throw error;
       }
       
@@ -178,7 +174,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      console.error('[DEBUG] Reset password exception:', error);
       set({ error: errorMessage, successMessage: null });
       throw error;
     } finally {

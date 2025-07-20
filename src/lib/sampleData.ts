@@ -126,7 +126,6 @@ export const SAMPLE_RECIPES: SampleRecipe[] = [
  * Load sample data into the database for testing/demo purposes
  */
 export async function loadSampleData(userId: string): Promise<{ success: boolean; message: string }> {
-  console.log('[DEBUG] Starting to load sample data for user:', userId);
   
   try {
     // Check if user already has recipes
@@ -137,12 +136,10 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
       .limit(1);
       
     if (checkError) {
-      console.error('[DEBUG] Error checking existing recipes:', checkError);
       return { success: false, message: 'Failed to check existing recipes' };
     }
     
     if (existingRecipes && existingRecipes.length > 0) {
-      console.log('[DEBUG] User already has recipes, skipping sample data');
       return { success: true, message: 'User already has recipes' };
     }
     
@@ -150,7 +147,6 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
     let loadedCount = 0;
     for (const sampleRecipe of SAMPLE_RECIPES) {
       try {
-        console.log(`[DEBUG] Loading sample recipe: ${sampleRecipe.title}`);
         
         // Create recipe entry
         const { data: recipe, error: recipeError } = await supabase
@@ -169,7 +165,6 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
           .single();
           
         if (recipeError) {
-          console.error(`[DEBUG] Error creating recipe ${sampleRecipe.id}:`, recipeError);
           continue;
         }
         
@@ -190,20 +185,16 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
               });
               
             if (frameError) {
-              console.error(`[DEBUG] Error inserting frame at ${frame.timestamp}s:`, frameError);
             } else {
               frameCount++;
             }
           } catch (frameError) {
-            console.error(`[DEBUG] Error processing frame at ${frame.timestamp}s:`, frameError);
           }
         }
         
-        console.log(`[DEBUG] Loaded recipe ${sampleRecipe.title} with ${frameCount}/${sampleRecipe.frames.length} frames`);
         loadedCount++;
         
       } catch (error) {
-        console.error(`[DEBUG] Error loading sample recipe ${sampleRecipe.id}:`, error);
       }
     }
     
@@ -213,7 +204,6 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
     };
     
   } catch (error) {
-    console.error('[DEBUG] Error loading sample data:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -235,7 +225,6 @@ export async function hasSampleData(userId: string): Promise<boolean> {
       
     return !error && data && data.length > 0;
   } catch (error) {
-    console.error('[DEBUG] Error checking sample data:', error);
     return false;
   }
 }
@@ -254,7 +243,6 @@ export async function removeSampleData(userId: string): Promise<{ success: boole
       .in('recipe_id', sampleRecipeIds);
       
     if (framesError) {
-      console.error('[DEBUG] Error deleting sample frames:', framesError);
     }
     
     // Delete recipes
@@ -265,13 +253,11 @@ export async function removeSampleData(userId: string): Promise<{ success: boole
       .in('id', sampleRecipeIds);
       
     if (recipesError) {
-      console.error('[DEBUG] Error deleting sample recipes:', recipesError);
       return { success: false, message: 'Failed to remove sample recipes' };
     }
     
     return { success: true, message: 'Sample data removed successfully' };
   } catch (error) {
-    console.error('[DEBUG] Error removing sample data:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error occurred'

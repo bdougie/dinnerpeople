@@ -163,7 +163,6 @@ export default function Upload() {
     let channel: RealtimeChannel | null = null;
 
     if (recipeId) {
-      console.log("[DEBUG] recipeId set, fetching processing status");
 
       supabase
         .from("processing_queue")
@@ -171,27 +170,15 @@ export default function Upload() {
         .eq("recipe_id", recipeId)
         .single()
         .then(({ data, error: queryError }) => {
-          console.log("[DEBUG] Processing queue status query result:", {
-            data,
-            error: queryError,
-          });
           if (!queryError && data) {
-            console.log("[DEBUG] Setting processing status to:", data.status);
             setProcessingStatus({
               status: data.status,
               error: data.error,
             });
           } else {
-            console.error(
-              "[DEBUG] Error fetching processing status:",
-              queryError
-            );
           }
         });
 
-      console.log(
-        "[DEBUG] Setting up realtime subscription for processing updates"
-      );
       channel = supabase
         .channel(`processing_${recipeId}`)
         .on(
@@ -203,7 +190,6 @@ export default function Upload() {
             filter: `recipe_id=eq.${recipeId}`,
           },
           (payload) => {
-            console.log("[DEBUG] Received realtime update:", payload);
             const newData = payload.new as { status?: string; error?: string };
             if (newData.status) {
               setProcessingStatus({
@@ -211,10 +197,6 @@ export default function Upload() {
                 error: newData.error,
               });
             }
-            console.log(
-              "[DEBUG] Updated processing status to:",
-              newData.status
-            );
 
             if (newData.status === "completed") {
               toast.success("Video processing completed!");
@@ -224,13 +206,11 @@ export default function Upload() {
           }
         )
         .subscribe((status) => {
-          console.log("[DEBUG] Subscription status:", status);
         });
     }
 
     return () => {
       if (channel) {
-        console.log("[DEBUG] Cleaning up realtime subscription");
         supabase.removeChannel(channel);
       }
     };
@@ -239,7 +219,6 @@ export default function Upload() {
   const processVideoFrames = useCallback(async (videoFile: File, recipeId: string) => {
     try {
       setProcessingFrames(true);
-      console.log("[DEBUG] Starting frame extraction");
 
       // Get current user to verify permissions
       const { data: userData } = await supabase.auth.getUser();
@@ -255,7 +234,6 @@ export default function Upload() {
         .single();
 
       if (recipeError) {
-        console.error("[DEBUG] Error verifying recipe ownership:", recipeError);
         throw new Error("Could not verify recipe ownership");
       }
 
@@ -265,12 +243,10 @@ export default function Upload() {
 
       // Extract frames from the video
       const frames = await extractFrames(videoFile);
-      console.log(`[DEBUG] Extracted ${frames.length} frames from video`);
       setFrameProgress({ current: 0, total: frames.length });
       setValidationStatus(prev => ({ ...prev, frameExtraction: frames.length > 0 }));
 
       // Upload frames to Supabase
-      console.log("[DEBUG] Starting frame uploads");
       const uploadedFrames = [];
 
       for (let i = 0; i < frames.length; i++) {
@@ -284,7 +260,6 @@ export default function Upload() {
           .upload(path, frame.blob);
 
         if (uploadError) {
-          console.error(`[DEBUG] Error uploading frame ${i}:`, uploadError);
           continue;
         }
 
@@ -305,9 +280,6 @@ export default function Upload() {
         }));
       }
 
-      console.log(
-        `[DEBUG] Successfully uploaded ${uploadedFrames.length} frames`
-      );
 
       // Update processing steps to show "analysis" as current
       setProcessingSteps((steps) =>
@@ -324,7 +296,6 @@ export default function Upload() {
         }))
       );
 
-      console.log("[DEBUG] Processing frames and generating descriptions");
       
       // Track frame processing results
       let frameProcessingSuccess = false;
@@ -335,26 +306,19 @@ export default function Upload() {
         await ai.processVideoFrames(recipeId, uploadedFrames);
         frameProcessingSuccess = true;
         processedFrameCount = uploadedFrames.length;
-        console.log(`[DEBUG] Successfully processed ${processedFrameCount} frames`);
         setValidationStatus(prev => ({ ...prev, embeddings: true }));
       } catch (frameError) {
-        console.error("[DEBUG] Error processing frames:", frameError);
         setValidationStatus(prev => ({ ...prev, embeddings: false }));
         // Continue with recipe summary even if some frames failed
       }
 
-      console.log(
-        "[DEBUG] Frame processing complete, generating recipe summary"
-      );
 
       // Generate recipe title and description based on processed frames
       let summaryGenerated = false;
       try {
         await ai.updateRecipeWithSummary(recipeId);
         summaryGenerated = true;
-        console.log("[DEBUG] Recipe summary generated and updated");
       } catch (summaryError) {
-        console.error("[DEBUG] Error generating recipe summary:", summaryError);
         // Continue even if summary generation fails
       }
       
@@ -386,12 +350,7 @@ export default function Upload() {
           // Fix: Bind the method to the ai instance or use an arrow function
           (imageUrl, customPrompt) => ai.analyzeFrame(imageUrl, customPrompt)
         );
-        console.log(
-          "[DEBUG] Social handles extracted and processed:",
-          socialHandles
-        );
       } catch (socialError) {
-        console.error("[DEBUG] Error processing social handles:", socialError);
         // Continue even if social handle extraction fails
       }
 
@@ -405,7 +364,6 @@ export default function Upload() {
         .eq("recipe_id", recipeId);
 
       if (updateError) {
-        console.error("[DEBUG] Error updating processing status:", updateError);
         throw updateError;
       }
 
@@ -443,7 +401,6 @@ export default function Upload() {
         }
       }
     } catch (err) {
-      console.error("[DEBUG] Error processing frames:", err);
       const errorMsg = err instanceof Error ? err.message : "Unknown error";
       toast.error(`Error processing video frames: ${errorMsg}`);
 
@@ -472,7 +429,6 @@ export default function Upload() {
           });
         }
       } catch (updateErr) {
-        console.error("[DEBUG] Error updating failure status:", updateErr);
       }
     } finally {
       setProcessingFrames(false);
@@ -486,9 +442,6 @@ export default function Upload() {
       recipeId &&
       !processingFrames
     ) {
-      console.log(
-        "[DEBUG] Processing status changed to processing, starting frame extraction"
-      );
       processVideoFrames(preview.file, recipeId);
     }
   }, [processingStatus, preview, recipeId, processingFrames, processVideoFrames]);
@@ -573,7 +526,6 @@ export default function Upload() {
     // Check API key
     const hasApiKey = !!import.meta.env['VITE_OPENAI_API_KEY'];
     setValidationStatus(prev => ({ ...prev, apiKey: hasApiKey }));
-    console.log('[DEBUG] API key validation:', hasApiKey);
 
     // Validate file type
     const isValidType = file.type.startsWith("video/");
@@ -594,9 +546,7 @@ export default function Upload() {
     }
 
     try {
-      console.log("[DEBUG] Starting thumbnail generation");
       const thumbnailUrl = await generateThumbnail(file);
-      console.log("[DEBUG] Thumbnail generated successfully");
       setValidationStatus(prev => ({ ...prev, thumbnail: true }));
 
       setPreview({ file, thumbnailUrl });
@@ -604,7 +554,6 @@ export default function Upload() {
       // Check if compression is needed
       let fileToUpload = file;
       if (isCompressionNeeded()) {
-        console.log("[DEBUG] Starting video compression");
         setProcessingSteps((steps) =>
           steps.map((step) => ({
             ...step,
@@ -614,7 +563,6 @@ export default function Upload() {
         
         try {
           fileToUpload = await compression.compress(file);
-          console.log("[DEBUG] Compression completed:", formatCompressionStats(file.size, fileToUpload.size));
           
           // Update compression step to completed
           setProcessingSteps((steps) =>
@@ -624,7 +572,6 @@ export default function Upload() {
             }))
           );
         } catch (compressionError) {
-          console.error("[DEBUG] Compression failed, using original file:", compressionError);
           // Continue with original file if compression fails
           toast.error("Video optimization failed, uploading original file", {
             duration: 4000,
@@ -637,7 +584,6 @@ export default function Upload() {
         );
       }
 
-      console.log("[DEBUG] Starting video upload to Supabase");
       setIsUploading(true);
       
       // Update upload step to current
@@ -652,9 +598,7 @@ export default function Upload() {
       uploadProgress.startUpload(fileToUpload.size);
       
       const result = await uploadVideo(fileToUpload, thumbnailUrl); // Pass the compressed file to upload
-      console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
       setRecipeId(result.recipeId);
-      console.log("[DEBUG] RecipeId state updated:", result.recipeId);
       
       // Add to background uploads
       // Note: The actual upload has already completed at this point,
@@ -708,10 +652,6 @@ export default function Upload() {
 
       // Set initial processing status from upload result to avoid waiting for realtime updates
       if (result.processingStatus) {
-        console.log(
-          "[DEBUG] Setting initial processing status from upload result:",
-          result.processingStatus
-        );
         setProcessingStatus({
           status: result.processingStatus as
             | "pending"
@@ -722,9 +662,7 @@ export default function Upload() {
       }
 
       setIsUploading(false);
-      console.log("[DEBUG] Upload state set to false");
     } catch (err) {
-      console.error("[DEBUG] Upload error:", err);
       
       // Update validation status for failure
       if (err instanceof Error && err.message.includes('thumbnail')) {
@@ -767,10 +705,8 @@ export default function Upload() {
       recipeId &&
       (!processingStatus || processingStatus.status === "pending")
     ) {
-      console.log("[DEBUG] Setting up fallback polling for processing status");
 
       interval = window.setInterval(() => {
-        console.log("[DEBUG] Polling for processing status");
         supabase
           .from("processing_queue")
           .select("status, error")
@@ -778,7 +714,6 @@ export default function Upload() {
           .single()
           .then(({ data, error }) => {
             if (!error && data && data.status !== processingStatus?.status) {
-              console.log("[DEBUG] Polling found updated status:", data.status);
               setProcessingStatus({
                 status: data.status,
                 error: data.error,

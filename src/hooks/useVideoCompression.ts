@@ -21,7 +21,6 @@ export function useVideoCompression() {
   const compress = useCallback(async (file: File): Promise<File> => {
     // Check if compression is needed
     if (!isCompressionNeeded()) {
-      console.log('File is already small enough, skipping compression');
       return file;
     }
 

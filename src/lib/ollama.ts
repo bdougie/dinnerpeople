@@ -58,7 +58,6 @@ class OllamaAPI {
    */
   private async generateCompletion(prompt: string, imageBase64?: string): Promise<string> {
     try {
-      console.log(`[DEBUG] Sending completion request to Ollama with model ${this.model}`);
       
       const requestBody: {
         model: string;
@@ -91,11 +90,9 @@ class OllamaAPI {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error(`[DEBUG] Ollama error response: ${errText}`);
         
         // Check for model not found error and provide helpful message
         if (errText.includes("model") && errText.includes("not found")) {
-          console.error(`[DEBUG] Model '${this.model}' not found. Please run: ollama pull ${this.model}`);
           throw new Error(`Ollama model '${this.model}' not found. Please run: ollama pull ${this.model}`);
         }
         
@@ -105,7 +102,6 @@ class OllamaAPI {
       const data = await response.json() as OllamaResponse;
       return data.response;
     } catch (error) {
-      console.error('[DEBUG] Error calling Ollama API:', error);
       throw error;
     }
   }
@@ -123,13 +119,10 @@ class OllamaAPI {
       const prompt = customPrompt || PromptUtils.PROMPTS.FRAME_ANALYSIS;
       
       // Convert image to base64
-      console.log('[DEBUG] Converting image to base64 for analysis');
       const imageBase64 = await this.imageUrlToBase64(imageUrl);
       
-      console.log('[DEBUG] Analyzing frame with image data');
       return await this.generateCompletion(prompt, imageBase64);
     } catch (error) {
-      console.error('[DEBUG] Error analyzing frame with Ollama:', error);
       // Return a placeholder response if analysis fails
       return `Unable to provide more details due to processing limitations. ${imageUrl}`;
     }
@@ -163,9 +156,7 @@ class OllamaAPI {
             image_url: frame.imageUrl
           });
 
-        console.log(`[DEBUG] Processed frame at ${frame.timestamp}s`);
       } catch (error) {
-        console.error(`[DEBUG] Error processing frame at ${frame.timestamp}:`, error);
         // Continue with other frames even if one fails
       }
     }
@@ -183,7 +174,6 @@ class OllamaAPI {
     }
 
     try {
-      console.log(`[DEBUG] Generating embedding with ${OLLAMA_EMBED_MODEL}`);
       
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -198,10 +188,8 @@ class OllamaAPI {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error(`[DEBUG] Ollama embedding error: ${errText}`);
         
         if (errText.includes("model") && errText.includes("not found")) {
-          console.error(`[DEBUG] Model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
           throw new Error(`Ollama model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
         }
         
@@ -211,7 +199,6 @@ class OllamaAPI {
       const data = await response.json();
       return data.embedding;
     } catch (error) {
-      console.error('[DEBUG] Error generating embedding with Ollama:', error);
       throw error;
     }
   }
@@ -243,7 +230,6 @@ class OllamaAPI {
         .single();
 
       if (recipeError) {
-        console.error('[DEBUG] Error verifying recipe ownership:', recipeError);
         throw new Error('Could not verify recipe ownership');
       }
 
@@ -265,9 +251,7 @@ class OllamaAPI {
       });
 
       if (insertError) throw insertError;
-      console.log(`[DEBUG] Successfully stored frame at ${timestamp}s`);
     } catch (error) {
-      console.error('[DEBUG] Error storing frame with embedding:', error);
       throw error;
     }
   }
@@ -316,8 +300,6 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
         // Try to parse response as JSON
         return PromptUtils.parseRecipeSummaryResponse(response);
       } catch (parseError) {
-        console.error('[DEBUG] Failed to parse Ollama response as JSON:', parseError);
-        console.log('[DEBUG] Raw response:', response);
         
         // Fallback: Extract a title from the response if possible
         let title = 'Untitled Recipe';
@@ -336,7 +318,6 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
         };
       }
     } catch (error) {
-      console.error('[DEBUG] Error generating recipe summary with Ollama:', error);
       console.log(`Formatted cooking steps: ${cookingSteps.substring(0, 100)}...`);
       return {
         title: 'Untitled Recipe',
@@ -419,10 +400,8 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       const prompt = customPrompt || PromptUtils.PROMPTS.SOCIAL_MEDIA_DETECTION;
       
       // Convert image to base64
-      console.log('[DEBUG] Converting image to base64 for social media detection');
       const imageBase64 = await this.imageUrlToBase64(imageUrl);
       
-      console.log('[DEBUG] Analyzing image for social media handles');
       const response = await this.generateCompletion(prompt, imageBase64);
       
       // Extract social handles

@@ -84,16 +84,11 @@ export function formatCookingSteps(descriptions: string[]): string {
  */
 export function parseRecipeSummaryResponse(response: string): RecipeSummary {
   // Log the raw response to see what we're getting
-  console.log('[DEBUG] Raw response before parsing:', response);
-  console.log('[DEBUG] Response type:', typeof response);
-  console.log('[DEBUG] Response length:', response?.length);
   
   try {
     // Log the first 100 characters to get a preview
-    console.log('[DEBUG] Response preview:', response?.substring(0, 100));
     
     const parsed = JSON.parse(response);
-    console.log('[DEBUG] Successfully parsed JSON:', parsed);
     
     return {
       title: parsed.title || 'Untitled Recipe',
@@ -104,7 +99,6 @@ export function parseRecipeSummaryResponse(response: string): RecipeSummary {
     console.error('Failed to parse AI response as JSON:', e);
     // Log more details about the error
     const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    console.error('[DEBUG] Error details:', errorMessage);
     
     return {
       title: 'Unknown Recipe',
@@ -135,7 +129,6 @@ export async function updateRecipeWithGeneratedSummary(
       
     if (error) throw error;
     
-    console.log('[DEBUG] Updated recipe with AI-generated summary:', summary);
   } catch (error) {
     console.error('Error updating recipe with summary:', error);
     throw error;
@@ -325,10 +318,7 @@ export async function processSocialHandles(
 
       if (updateError) console.error('Error updating recipe attribution:', updateError);
 
-      console.log('[DEBUG] Stored recipe social handles:', socialHandles);
-      console.log('[DEBUG] Updated recipe attribution with formatted URL:', formattedUrl);
     } else {
-      console.log('[DEBUG] No social handles found, skipping database update');
     }
 
     return socialHandles;

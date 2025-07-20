@@ -81,7 +81,6 @@ export async function compressVideo(
     const inputFileName = 'input.mp4';
     const outputFileName = 'output.mp4';
     
-    console.log('Writing file to FFmpeg filesystem...');
     if (onProgress) onProgress(5); // Show initial progress
     
     await ffmpeg.writeFile(inputFileName, await fetchFile(file));
@@ -119,7 +118,6 @@ export async function compressVideo(
       outputFileName
     ];
     
-    console.log('Starting video compression with settings:', compressionArgs.join(' '));
     
     // Execute compression
     await ffmpeg.exec(compressionArgs);
@@ -133,7 +131,6 @@ export async function compressVideo(
     
     // Log compression results
     const compressionRatio = ((file.size - compressedFile.size) / file.size) * 100;
-    console.log(`Compression complete: ${formatFileSize(file.size)} → ${formatFileSize(compressedFile.size)} (${compressionRatio.toFixed(1)}% reduction)`);
     
     // Clean up
     if (progressTimeout) clearTimeout(progressTimeout);
