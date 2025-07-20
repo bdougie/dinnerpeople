@@ -197,7 +197,6 @@ export async function processVideoFrames(videoId: string, frames: { timestamp: n
     });
     
     // Log batch completion
-    const successCount = batchResults.filter(r => r.success).length;
     
     // Add delay between batches to avoid rate limits (except for last batch)
     if (i + BATCH_SIZE < frames.length) {

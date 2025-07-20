@@ -17,7 +17,7 @@ import { processSocialHandles } from "../lib/prompt-utils";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useUploadProgress, formatBytes, formatSpeed, formatTimeRemaining } from "../hooks/useUploadProgress";
 import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploadWithRealtimeProgress";
-import { useVideoCompression, formatCompressionStats } from "../hooks/useVideoCompression";
+import { useVideoCompression } from "../hooks/useVideoCompression";
 import { isCompressionNeeded } from "../lib/videoCompression";
 import { useUploadContext, useActiveUpload } from "../contexts/useUploadContext";
 import { UploadStatusTracker } from "../components/UploadStatusTracker";
@@ -205,7 +205,7 @@ export default function Upload() {
             }
           }
         )
-        .subscribe((status) => {
+        .subscribe(() => {
         });
     }
 
@@ -345,7 +345,7 @@ export default function Upload() {
 
       // Extract and process social handles
       try {
-        const socialHandles = await processSocialHandles(
+        await processSocialHandles(
           recipeId,
           // Fix: Bind the method to the ai instance or use an arrow function
           (imageUrl, customPrompt) => ai.analyzeFrame(imageUrl, customPrompt)

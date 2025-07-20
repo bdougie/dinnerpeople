@@ -129,9 +129,6 @@ export async function compressVideo(
     const blob = new Blob([data], { type: 'video/mp4' });
     const compressedFile = new File([blob], file.name, { type: 'video/mp4' });
     
-    // Log compression results
-    const compressionRatio = ((file.size - compressedFile.size) / file.size) * 100;
-    
     // Clean up
     if (progressTimeout) clearTimeout(progressTimeout);
     await ffmpeg.deleteFile(inputFileName);
@@ -142,11 +139,6 @@ export async function compressVideo(
     console.error('Video compression failed:', error);
     throw new Error('Failed to compress video. Please try again or use a smaller file.');
   }
-}
-
-function formatFileSize(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)}MB`;
 }
 
 export function isCompressionNeeded(): boolean {

@@ -21,7 +21,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
   const recipeId = uuidv4();
 
   // Create recipe entry with a temporary title and thumbnail if provided
-  const { data: recipeData, error: recipeError } = await supabase
+  const { error: recipeError } = await supabase
     .from('recipes')
     .insert({
       id: recipeId,
@@ -61,7 +61,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
   }
 
   // Add to processing queue
-  const { data: queueData, error: queueError } = await supabase
+  const { error: queueError } = await supabase
     .from('processing_queue')
     .insert({
       recipe_id: recipeId,
