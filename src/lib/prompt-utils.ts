@@ -40,7 +40,17 @@ export const PROMPTS = {
     For example: {"title": "Recipe Title", "description": "Recipe description text"}
     
     If you cannot determine what the recipe is about, respond with:
-    {"title": "Unknown Recipe", "description": "The recipe content could not be determined from the video frames."}`
+    {"title": "Unknown Recipe", "description": "The recipe content could not be determined from the video frames."}`,
+  
+  VIDEO_TITLE_GENERATION:
+    `Look at this cooking video thumbnail and generate a short, descriptive recipe title.
+    The title should be:
+    - Under 50 characters
+    - Descriptive of the main dish or food item shown
+    - Appealing and easy to understand
+    - If you can't identify the dish, describe what you see (e.g., "Colorful Vegetable Dish")
+    
+    Respond with ONLY the title, no extra text or punctuation.`
 }
 
 /**

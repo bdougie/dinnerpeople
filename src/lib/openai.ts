@@ -203,3 +203,61 @@ export async function updateRecipeWithSummary(recipeId: string): Promise<RecipeS
 export async function summarize(recipeId: string): Promise<PromptUtils.RecipeSummary> {
   return PromptUtils.summarize(recipeId, generateRecipeSummary);
 }
+
+/**
+ * Generate a title for a video based on its thumbnail
+ */
+export async function generateVideoTitle(thumbnailUrl: string): Promise<string> {
+  try {
+    let finalImageUrl = thumbnailUrl;
+    
+    // If the image URL is from localhost, fetch and convert to base64
+    if (thumbnailUrl.includes('localhost') || thumbnailUrl.includes('127.0.0.1')) {
+      try {
+        const response = await fetch(thumbnailUrl);
+        const blob = await response.blob();
+        const buffer = await blob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        finalImageUrl = `data:${blob.type};base64,${base64}`;
+      } catch (fetchError) {
+        console.error('Error fetching local thumbnail:', fetchError);
+        // Continue with the original URL
+      }
+    }
+    
+    const response = await openai.chat.completions.create({
+      model: OPENAI_IMAGE_MODEL,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: PromptUtils.PROMPTS.VIDEO_TITLE_GENERATION
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: finalImageUrl
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 50
+    });
+
+    const title = response.choices[0]?.message?.content?.trim() || '';
+    
+    // Validate the title
+    if (title && title.length > 0 && title.length <= 60) {
+      return title;
+    }
+    
+    // Fallback to default
+    return `Untitled Recipe ${new Date().toLocaleDateString()}`;
+  } catch (error) {
+    console.error('Error generating video title:', error);
+    return `Untitled Recipe ${new Date().toLocaleDateString()}`;
+  }
+}

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadVideoWithRealtimeProgress } from './uploadWithRealtimeProgress';
+import { generateVideoTitle } from './openai';
 
 export interface UploadResult {
   recipeId: string;
@@ -42,6 +43,32 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
   if (recipeError) {
     console.error('[DEBUG] Recipe creation error:', recipeError);
     throw recipeError;
+  }
+
+  // Generate a better title using the thumbnail if available
+  if (thumbnailUrl) {
+    try {
+      console.log('[DEBUG] Generating title from thumbnail');
+      const generatedTitle = await generateVideoTitle(thumbnailUrl);
+      
+      if (generatedTitle && !generatedTitle.includes('Untitled Recipe')) {
+        console.log('[DEBUG] Generated title:', generatedTitle);
+        
+        // Update the recipe with the generated title
+        const { error: updateError } = await supabase
+          .from('recipes')
+          .update({ title: generatedTitle })
+          .eq('id', recipeId);
+          
+        if (updateError) {
+          console.error('[DEBUG] Error updating recipe title:', updateError);
+          // Continue even if title update fails
+        }
+      }
+    } catch (titleError) {
+      console.error('[DEBUG] Error generating title:', titleError);
+      // Continue with the default title
+    }
   }
 
   // Add to processing queue

@@ -67,7 +67,7 @@ export default function Upload() {
 
   const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
     { id: "compress", label: "Optimizing video", status: "waiting" },
-    { id: "upload", label: "Uploading video", status: "waiting" },
+    { id: "upload", label: "Uploading video & generating title", status: "waiting" },
     { id: "frames", label: "Processing frames", status: "waiting" },
     { id: "analysis", label: "Analyzing content", status: "waiting" },
   ]);
@@ -771,7 +771,7 @@ export default function Upload() {
     // Reset processing steps
     setProcessingSteps([
       { id: "compress", label: "Optimizing video", status: "waiting" },
-      { id: "upload", label: "Uploading video", status: "waiting" },
+      { id: "upload", label: "Uploading video & generating title", status: "waiting" },
       { id: "frames", label: "Processing frames", status: "waiting" },
       { id: "analysis", label: "Analyzing content", status: "waiting" },
     ]);
