@@ -176,6 +176,7 @@ export default function Upload() {
               error: data.error,
             });
           } else {
+            // Query completed, no error
           }
         });
 
@@ -307,7 +308,7 @@ export default function Upload() {
         frameProcessingSuccess = true;
         processedFrameCount = uploadedFrames.length;
         setValidationStatus(prev => ({ ...prev, embeddings: true }));
-      } catch (frameError) {
+      } catch {
         setValidationStatus(prev => ({ ...prev, embeddings: false }));
         // Continue with recipe summary even if some frames failed
       }
@@ -318,7 +319,7 @@ export default function Upload() {
       try {
         await ai.updateRecipeWithSummary(recipeId);
         summaryGenerated = true;
-      } catch (summaryError) {
+      } catch {
         // Continue even if summary generation fails
       }
       
@@ -350,7 +351,7 @@ export default function Upload() {
           // Fix: Bind the method to the ai instance or use an arrow function
           (imageUrl, customPrompt) => ai.analyzeFrame(imageUrl, customPrompt)
         );
-      } catch (socialError) {
+      } catch {
         // Continue even if social handle extraction fails
       }
 
@@ -428,7 +429,8 @@ export default function Upload() {
             completedAt: new Date()
           });
         }
-      } catch (updateErr) {
+      } catch {
+        // Failed to update processing status
       }
     } finally {
       setProcessingFrames(false);
@@ -571,7 +573,7 @@ export default function Upload() {
               status: step.id === "compress" ? "completed" : step.status,
             }))
           );
-        } catch (compressionError) {
+        } catch {
           // Continue with original file if compression fails
           toast.error("Video optimization failed, uploading original file", {
             duration: 4000,

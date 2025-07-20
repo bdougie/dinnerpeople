@@ -63,7 +63,7 @@ class AIService {
           frame.imageUrl
         );
         
-      } catch (error) {
+      } catch {
         // Continue with other frames even if one fails
       }
     }

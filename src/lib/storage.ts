@@ -55,7 +55,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
           // Continue even if title update fails
         }
       }
-    } catch (titleError) {
+    } catch {
       // Continue with the default title
     }
   }
@@ -98,7 +98,9 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .eq('id', recipeId);
 
     if (updateError) {
+      // Failed to update recipe with video URL
     } else {
+      // Recipe updated successfully with video URL
     }
 
     // Upload successful - update processing_queue status to "processing"
@@ -111,7 +113,9 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .eq('recipe_id', recipeId);
     
     if (queueUpdateError) {
+      // Failed to update processing queue status
     } else {
+      // Processing queue updated successfully
     }
 
     // If we have a data URL for the thumbnail, save it to storage
@@ -128,6 +132,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
           .upload(thumbnailPath, blob);
           
         if (thumbError) {
+          // Failed to upload thumbnail
         } else {
           // Get the public URL
           const { data: urlData } = supabase.storage
@@ -143,10 +148,12 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
             .eq('id', recipeId);
             
           if (updateThumbError) {
+            // Failed to update recipe with thumbnail URL
           } else {
+            // Recipe updated successfully with thumbnail URL
           }
         }
-      } catch (thumbErr) {
+      } catch {
         // Don't fail the whole upload if just the thumbnail processing fails
       }
     }

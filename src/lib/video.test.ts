@@ -167,7 +167,7 @@ describe('Video Frame Processing', () => {
       ];
 
       // Make all uploads fail
-      mockStorageUpload.mockResolvedValue({ error: new Error('Upload failed') });
+      mockStorageUpload.mockImplementation(() => Promise.resolve({ error: new Error('Upload failed') }));
 
       const result = await uploadFrames(frames, 'recipe-123');
 

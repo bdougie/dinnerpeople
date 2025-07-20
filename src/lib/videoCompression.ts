@@ -1,7 +1,10 @@
 // Dynamic imports to avoid build issues with FFmpeg in Vite 7
-let ffmpeg: any = null;
-let FFmpegModule: any = null;
-let FFmpegUtil: any = null;
+import type { FFmpeg } from '@ffmpeg/ffmpeg';
+import type { fetchFile as FetchFileType, toBlobURL as ToBlobURLType } from '@ffmpeg/util';
+
+let ffmpeg: FFmpeg | null = null;
+let FFmpegModule: { FFmpeg: typeof FFmpeg } | null = null;
+let FFmpegUtil: { fetchFile: typeof FetchFileType; toBlobURL: typeof ToBlobURLType } | null = null;
 
 interface CompressionOptions {
   targetSizeMB?: number;
@@ -21,7 +24,7 @@ async function loadFFmpegModules() {
   return { FFmpeg: FFmpegModule.FFmpeg, fetchFile: FFmpegUtil.fetchFile, toBlobURL: FFmpegUtil.toBlobURL };
 }
 
-export async function initializeFFmpeg(): Promise<any> {
+export async function initializeFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg) return ffmpeg;
   
   const { FFmpeg, toBlobURL } = await loadFFmpegModules();
@@ -63,8 +66,8 @@ export async function compressVideo(
       }, PROGRESS_TIMEOUT);
     };
     
-    ffmpeg.on('progress', ({ progress }: { progress: number }) => {
-      const currentProgress = Math.round(progress * 100);
+    ffmpeg.on('progress', (event: { progress: number }) => {
+      const currentProgress = Math.round(event.progress * 100);
       if (currentProgress > lastProgress) {
         lastProgress = currentProgress;
         resetProgressTimeout();

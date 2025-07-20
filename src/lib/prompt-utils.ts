@@ -317,6 +317,7 @@ export async function processSocialHandles(
       if (updateError) console.error('Error updating recipe attribution:', updateError);
 
     } else {
+      // No social handles found, nothing to update
     }
 
     return socialHandles;

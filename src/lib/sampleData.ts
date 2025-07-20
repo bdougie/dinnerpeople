@@ -169,7 +169,6 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
         }
         
         // Load frames for this recipe
-        let frameCount = 0;
         for (const frame of sampleRecipe.frames) {
           try {
             const embedding = await generateEmbedding(frame.description);
@@ -185,16 +184,19 @@ export async function loadSampleData(userId: string): Promise<{ success: boolean
               });
               
             if (frameError) {
+              // Frame insertion error, skip this frame
             } else {
-              frameCount++;
+              // Frame inserted successfully
             }
-          } catch (frameError) {
+          } catch {
+            // Frame processing error, continue with next frame
           }
         }
         
         loadedCount++;
         
-      } catch (error) {
+      } catch {
+        // Recipe processing error, continue with next recipe
       }
     }
     
@@ -224,7 +226,7 @@ export async function hasSampleData(userId: string): Promise<boolean> {
       .limit(1);
       
     return !error && data && data.length > 0;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -243,6 +245,7 @@ export async function removeSampleData(userId: string): Promise<{ success: boole
       .in('recipe_id', sampleRecipeIds);
       
     if (framesError) {
+      // Frames deletion error, continue with recipe deletion
     }
     
     // Delete recipes

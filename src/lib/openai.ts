@@ -27,7 +27,7 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
         const buffer = await blob.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
         finalImageUrl = `data:${blob.type};base64,${base64}`;
-      } catch (fetchError) {
+      } catch {
         throw new Error('Failed to fetch local image for analysis');
       }
     }
@@ -86,7 +86,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        // Auth error handled
       } else if (error.message.includes('rate limit')) {
+        // Rate limit error handled
       }
     }
     // Return empty array to allow frame storage to continue
@@ -120,23 +122,19 @@ export async function storeFrameWithEmbedding(
       throw error;
     }
     
-  } catch (error) {
+  } catch {
     // Even if embedding fails, try to store the frame without embedding
-    try {
-      const { error: fallbackError } = await supabase
-        .from('video_frames')
-        .insert({
-          recipe_id: recipeId,
-          timestamp,
-          description,
-          image_url: imageUrl,
-          embedding: null
-        });
-      
-      if (fallbackError) {
-        throw fallbackError;
-      }
-    } catch (fallbackError) {
+    const { error: fallbackError } = await supabase
+      .from('video_frames')
+      .insert({
+        recipe_id: recipeId,
+        timestamp,
+        description,
+        image_url: imageUrl,
+        embedding: null
+      });
+    
+    if (fallbackError) {
       throw fallbackError;
     }
   }
@@ -164,8 +162,7 @@ export async function processVideoFrames(videoId: string, frames: { timestamp: n
           description,
           success: true
         };
-      } catch (error) {
-        
+      } catch {
         // Try to store frame with error description
         try {
           await storeFrameWithEmbedding(
@@ -174,7 +171,8 @@ export async function processVideoFrames(videoId: string, frames: { timestamp: n
             'Frame processing failed', 
             frame.imageUrl
           );
-        } catch (storeError) {
+        } catch {
+          // Storage error handled
         }
         
         return {
@@ -248,6 +246,7 @@ export async function generateRecipeSummary(cookingSteps: string): Promise<Promp
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        // Auth error handled
       }
     }
     return {
@@ -327,7 +326,7 @@ export async function generateVideoTitle(thumbnailUrl: string): Promise<string> 
         const buffer = await blob.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
         finalImageUrl = `data:${blob.type};base64,${base64}`;
-      } catch (fetchError) {
+      } catch {
         // Continue with the original URL
       }
     }
@@ -366,6 +365,7 @@ export async function generateVideoTitle(thumbnailUrl: string): Promise<string> 
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        // Auth error handled
       }
     }
     return `Untitled Recipe ${new Date().toLocaleDateString()}`;

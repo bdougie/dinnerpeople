@@ -57,53 +57,48 @@ class OllamaAPI {
    * Generate a completion with the Ollama API
    */
   private async generateCompletion(prompt: string, imageBase64?: string): Promise<string> {
-    try {
-      
-      const requestBody: {
-        model: string;
-        prompt: string;
-        stream: boolean;
-        images?: string[];
-      } = {
-        model: this.model,
-        prompt,
-        stream: false
-      };
+    const requestBody: {
+      model: string;
+      prompt: string;
+      stream: boolean;
+      images?: string[];
+    } = {
+      model: this.model,
+      prompt,
+      stream: false
+    };
 
-      // Add the image to the request if provided
-      if (imageBase64) {
-        // Extract the base64 data (remove data URL prefix if present)
-        const base64Data = imageBase64.includes('base64,') 
-          ? imageBase64.split('base64,')[1] 
-          : imageBase64;
-          
-        requestBody.images = [base64Data || ''];
-      }
-      
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
+    // Add the image to the request if provided
+    if (imageBase64) {
+      // Extract the base64 data (remove data URL prefix if present)
+      const base64Data = imageBase64.includes('base64,') 
+        ? imageBase64.split('base64,')[1] 
+        : imageBase64;
         
-        // Check for model not found error and provide helpful message
-        if (errText.includes("model") && errText.includes("not found")) {
-          throw new Error(`Ollama model '${this.model}' not found. Please run: ollama pull ${this.model}`);
-        }
-        
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json() as OllamaResponse;
-      return data.response;
-    } catch (error) {
-      throw error;
+      requestBody.images = [base64Data || ''];
     }
+    
+    const response = await fetch(`${this.baseUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      
+      // Check for model not found error and provide helpful message
+      if (errText.includes("model") && errText.includes("not found")) {
+        throw new Error(`Ollama model '${this.model}' not found. Please run: ollama pull ${this.model}`);
+      }
+      
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as OllamaResponse;
+    return data.response;
   }
 
   /**
@@ -122,7 +117,7 @@ class OllamaAPI {
       const imageBase64 = await this.imageUrlToBase64(imageUrl);
       
       return await this.generateCompletion(prompt, imageBase64);
-    } catch (error) {
+    } catch {
       // Return a placeholder response if analysis fails
       return `Unable to provide more details due to processing limitations. ${imageUrl}`;
     }
@@ -156,7 +151,7 @@ class OllamaAPI {
             image_url: frame.imageUrl
           });
 
-      } catch (error) {
+      } catch {
         // Continue with other frames even if one fails
       }
     }
@@ -173,34 +168,29 @@ class OllamaAPI {
       throw new Error('Ollama can only be used in local development environment');
     }
 
-    try {
+    const response = await fetch(`${this.baseUrl}/api/embeddings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OLLAMA_EMBED_MODEL,
+        prompt: text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
       
-      const response = await fetch(`${this.baseUrl}/api/embeddings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: OLLAMA_EMBED_MODEL,
-          prompt: text,
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        
-        if (errText.includes("model") && errText.includes("not found")) {
-          throw new Error(`Ollama model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
-        }
-        
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      if (errText.includes("model") && errText.includes("not found")) {
+        throw new Error(`Ollama model '${OLLAMA_EMBED_MODEL}' not found. Please run: ollama pull ${OLLAMA_EMBED_MODEL}`);
       }
-
-      const data = await response.json();
-      return data.embedding;
-    } catch (error) {
-      throw error;
+      
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return data.embedding;
   }
 
   /**
@@ -216,44 +206,40 @@ class OllamaAPI {
       throw new Error('Ollama can only be used in local development environment');
     }
 
-    try {
-      // Verify that the authenticated user owns the recipe
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data: recipeData, error: recipeError } = await supabase
-        .from('recipes')
-        .select('user_id')
-        .eq('id', recipeId)
-        .single();
-
-      if (recipeError) {
-        throw new Error('Could not verify recipe ownership');
-      }
-
-      if (recipeData.user_id !== userData.user.id) {
-        throw new Error('Not authorized to process this recipe');
-      }
-
-      // Generate embedding
-      const embedding = await this.generateEmbedding(description);
-      const paddedEmbedding = this.padEmbedding(embedding, 1536);
-
-      // Insert frame after ownership verification
-      const { error: insertError } = await supabase.from('video_frames').insert({
-        recipe_id: recipeId,
-        timestamp,
-        description,
-        image_url: imageUrl,
-        embedding: `[${paddedEmbedding.join(',')}]` // Store embedding as string-formatted vector
-      });
-
-      if (insertError) throw insertError;
-    } catch (error) {
-      throw error;
+    // Verify that the authenticated user owns the recipe
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      throw new Error('User not authenticated');
     }
+
+    const { data: recipeData, error: recipeError } = await supabase
+      .from('recipes')
+      .select('user_id')
+      .eq('id', recipeId)
+      .single();
+
+    if (recipeError) {
+      throw new Error('Could not verify recipe ownership');
+    }
+
+    if (recipeData.user_id !== userData.user.id) {
+      throw new Error('Not authorized to process this recipe');
+    }
+
+    // Generate embedding
+    const embedding = await this.generateEmbedding(description);
+    const paddedEmbedding = this.padEmbedding(embedding, 1536);
+
+    // Insert frame after ownership verification
+    const { error: insertError } = await supabase.from('video_frames').insert({
+      recipe_id: recipeId,
+      timestamp,
+      description,
+      image_url: imageUrl,
+      embedding: `[${paddedEmbedding.join(',')}]` // Store embedding as string-formatted vector
+    });
+
+    if (insertError) throw insertError;
   }
 
   /**
@@ -299,8 +285,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
       try {
         // Try to parse response as JSON
         return PromptUtils.parseRecipeSummaryResponse(response);
-      } catch (parseError) {
-        
+      } catch {
         // Fallback: Extract a title from the response if possible
         let title = 'Untitled Recipe';
         if (response.includes('title') || response.includes('Title')) {
@@ -317,7 +302,7 @@ Example: {"title": "Recipe Title", "description": "Recipe description text"}`;
                       response.substring(0, 100).replace(/["{}[\]]/g, '') + '...'
         };
       }
-    } catch (error) {
+    } catch {
       console.log(`Formatted cooking steps: ${cookingSteps.substring(0, 100)}...`);
       return {
         title: 'Untitled Recipe',
