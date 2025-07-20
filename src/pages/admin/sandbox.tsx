@@ -5,6 +5,7 @@ import { generateEmbedding } from "../../lib/openai";
 import { initializeSearchFunctions } from "../../lib/search";
 import { ollama } from "../../lib/ollama";
 import { testLocalEmbeddings } from "../../lib/testLocalEmbeddings";
+import * as openai from "../../lib/openai";
 
 interface VideoInfo {
   id: string;
@@ -67,6 +68,13 @@ const AdminSandbox: React.FC = () => {
   );
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
+  // Add state for AI provider toggle
+  const [useOpenAI, setUseOpenAI] = useState(true); // Default to OpenAI
+  
+  // Add state for timing information
+  const [frameAnalysisTime, setFrameAnalysisTime] = useState<number | null>(null);
+  const [recipeSummaryTime, setRecipeSummaryTime] = useState<number | null>(null);
+  
   // Add state for selected models
   const [selectedTextModel, setSelectedTextModel] = useState("");
   const [selectedVisionModel, setSelectedVisionModel] = useState("");
@@ -238,21 +246,43 @@ const AdminSandbox: React.FC = () => {
     if (!selectedFrame) return;
 
     setIsTestingFrame(true);
+    setFrameAnalysisTime(null);
+    const startTime = Date.now();
+    
     try {
-      const response = await fetch("/api/admin/test-frame-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: selectedFrame.image_url,
-          prompt: framePrompt,
-          model: selectedVisionModel, // Use selected vision model
-        }),
-      });
+      let result: string;
+      
+      if (useOpenAI) {
+        // Use OpenAI directly for better control and timing
+        console.log('Using OpenAI for frame analysis...');
+        result = await openai.analyzeFrame(selectedFrame.image_url, framePrompt);
+      } else {
+        // Use Ollama through the API endpoint
+        console.log('Using Ollama for frame analysis...');
+        const response = await fetch("/api/admin/test-frame-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: selectedFrame.image_url,
+            prompt: framePrompt,
+            model: selectedVisionModel, // Use selected vision model
+          }),
+        });
 
-      const result = await response.json();
-      setFrameResult(result.analysis || "No result returned");
+        const data = await response.json();
+        result = data.analysis || "No result returned";
+      }
+      
+      const elapsed = Date.now() - startTime;
+      setFrameAnalysisTime(elapsed);
+      setFrameResult(result);
+      
+      console.log(`Frame analysis completed in ${elapsed}ms (${(elapsed/1000).toFixed(2)}s)`);
     } catch (error) {
       console.error("Error testing frame analysis:", error);
+      const elapsed = Date.now() - startTime;
+      setFrameAnalysisTime(elapsed);
+      
       if (error instanceof Error) {
         setFrameResult(`Error: ${error.message}`);
       } else {
@@ -267,32 +297,57 @@ const AdminSandbox: React.FC = () => {
     if (!selectedVideoId || frames.length === 0) return;
 
     setIsTestingRecipe(true);
+    setRecipeSummaryTime(null);
+    const startTime = Date.now();
+    
     try {
-      const response = await fetch("/api/admin/test-recipe-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          frames: frames.map((frame) => ({
-            timestamp: frame.timestamp,
-            description: frame.description || "No description available",
-          })),
-          prompt: recipePrompt,
-          streamResponse: true, // Add option to request streaming response
-          model: selectedTextModel, // Use selected text model
-        }),
-      });
+      let result;
+      
+      if (useOpenAI) {
+        // Use OpenAI directly for better control and timing
+        console.log('Using OpenAI for recipe summary...');
+        const cookingSteps = frames
+          .map((frame) => `${frame.timestamp}s: ${frame.description || "No description available"}`)
+          .join('\n');
+        
+        result = await openai.generateRecipeSummaryWithCustomPrompt(cookingSteps, recipePrompt);
+      } else {
+        // Use Ollama through the API endpoint
+        console.log('Using Ollama for recipe summary...');
+        const response = await fetch("/api/admin/test-recipe-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            frames: frames.map((frame) => ({
+              timestamp: frame.timestamp,
+              description: frame.description || "No description available",
+            })),
+            prompt: recipePrompt,
+            streamResponse: true, // Add option to request streaming response
+            model: selectedTextModel, // Use selected text model
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Server responded with ${response.status}: ${errorText}`
-        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Server responded with ${response.status}: ${errorText}`
+          );
+        }
+
+        const data = await response.json();
+        result = data.summary;
       }
-
-      const result = await response.json();
-      setRecipeResult(JSON.stringify(result.summary, null, 2));
+      
+      const elapsed = Date.now() - startTime;
+      setRecipeSummaryTime(elapsed);
+      setRecipeResult(JSON.stringify(result, null, 2));
+      
+      console.log(`Recipe summary completed in ${elapsed}ms (${(elapsed/1000).toFixed(2)}s)`);
     } catch (error) {
       console.error("Error testing recipe summary:", error);
+      const elapsed = Date.now() - startTime;
+      setRecipeSummaryTime(elapsed);
 
       // Improve error display with better error extraction
       let errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -843,10 +898,45 @@ const AdminSandbox: React.FC = () => {
         )}
       </div>
 
-      {/* Model Selection Panel */}
+      {/* AI Provider and Model Selection Panel */}
       <div className="mb-6 p-4 border rounded bg-gray-50">
-        <h2 className="text-xl font-semibold mb-2">Ollama Model Selection</h2>
-        <ModelSelector />
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">AI Configuration</h2>
+          <div className="flex items-center space-x-4">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useOpenAI}
+                onChange={(e) => setUseOpenAI(e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">
+                Use OpenAI {useOpenAI ? '(Active)' : '(Inactive)'}
+              </span>
+            </label>
+            <span className="text-sm text-gray-600">
+              {useOpenAI ? 'Using OpenAI API' : 'Using Ollama (Local)'}
+            </span>
+          </div>
+        </div>
+        
+        {!useOpenAI && (
+          <>
+            <h3 className="text-lg font-semibold mb-2">Ollama Model Selection</h3>
+            <ModelSelector />
+          </>
+        )}
+        
+        {useOpenAI && (
+          <div className="p-3 bg-blue-50 rounded">
+            <p className="text-sm text-blue-800">
+              OpenAI models in use:
+              <br />• Vision: gpt-4o
+              <br />• Text: gpt-4o
+              <br />• Embeddings: text-embedding-3-small (local transformer model)
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Video Selection Panel */}
@@ -967,6 +1057,11 @@ const AdminSandbox: React.FC = () => {
           <div className="mt-2 p-3 bg-gray-100 rounded min-h-20 whitespace-pre-wrap">
             {frameResult || "Run test to see results"}
           </div>
+          {frameAnalysisTime !== null && (
+            <div className="mt-2 text-sm text-gray-600">
+              Processing time: {frameAnalysisTime}ms ({(frameAnalysisTime/1000).toFixed(2)}s)
+            </div>
+          )}
         </div>
 
         {/* Recipe Summary Panel */}
@@ -989,6 +1084,11 @@ const AdminSandbox: React.FC = () => {
           <div className="mt-2 p-3 bg-gray-100 rounded min-h-20 whitespace-pre-wrap">
             {recipeResult || "Run test to see results"}
           </div>
+          {recipeSummaryTime !== null && (
+            <div className="mt-2 text-sm text-gray-600">
+              Processing time: {recipeSummaryTime}ms ({(recipeSummaryTime/1000).toFixed(2)}s)
+            </div>
+          )}
         </div>
 
         {/* Social Media Detection Panel */}
