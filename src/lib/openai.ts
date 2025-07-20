@@ -9,6 +9,59 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Note: In production, API calls should be made from backend
 });
 
+/**
+ * Validates if a URL is from an allowed Supabase storage domain
+ */
+function isAllowedSupabaseUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const supabaseProjectId = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    
+    if (!supabaseProjectId) return false;
+    
+    // Allow only URLs from our Supabase storage
+    const allowedHosts = [
+      `${supabaseProjectId}.supabase.co`,
+      // Local development URLs that are already validated by our app
+      'localhost',
+      '127.0.0.1'
+    ];
+    
+    return allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely converts an image URL to base64 with validation
+ */
+async function safeImageToBase64(imageUrl: string): Promise<string | null> {
+  // Validate the URL is from allowed sources
+  if (!isAllowedSupabaseUrl(imageUrl)) {
+    console.warn('[Security] Blocked fetch to non-allowed URL:', imageUrl);
+    return null;
+  }
+  
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    
+    // Validate content type is an image
+    if (!blob.type.startsWith('image/')) {
+      console.warn('[Security] Blocked non-image content type:', blob.type);
+      return null;
+    }
+    
+    const buffer = await blob.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    return `data:${blob.type};base64,${base64}`;
+  } catch (error) {
+    console.error('[Security] Failed to fetch image:', error);
+    return null;
+  }
+}
+
 export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   
   // Check if API key is configured
@@ -19,16 +72,13 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
   try {
     let finalImageUrl = imageUrl;
     
-    // If the image URL is from localhost, fetch and convert to base64
-    if (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
-      try {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const buffer = await blob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        finalImageUrl = `data:${blob.type};base64,${base64}`;
-      } catch {
-        throw new Error('Failed to fetch local image for analysis');
+    // Convert image to base64 if needed, with security validation
+    if (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1') || imageUrl.includes('supabase.co')) {
+      const base64Image = await safeImageToBase64(imageUrl);
+      if (base64Image) {
+        finalImageUrl = base64Image;
+      } else {
+        throw new Error('Failed to fetch image for analysis - invalid or unauthorized URL');
       }
     }
     
@@ -318,17 +368,13 @@ export async function generateVideoTitle(thumbnailUrl: string): Promise<string> 
   try {
     let finalImageUrl = thumbnailUrl;
     
-    // If the image URL is from localhost, fetch and convert to base64
-    if (thumbnailUrl.includes('localhost') || thumbnailUrl.includes('127.0.0.1')) {
-      try {
-        const response = await fetch(thumbnailUrl);
-        const blob = await response.blob();
-        const buffer = await blob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        finalImageUrl = `data:${blob.type};base64,${base64}`;
-      } catch {
-        // Continue with the original URL
+    // Convert image to base64 if needed, with security validation
+    if (thumbnailUrl.includes('localhost') || thumbnailUrl.includes('127.0.0.1') || thumbnailUrl.includes('supabase.co')) {
+      const base64Image = await safeImageToBase64(thumbnailUrl);
+      if (base64Image) {
+        finalImageUrl = base64Image;
       }
+      // If conversion fails, continue with original URL (OpenAI will handle it)
     }
     
     const response = await openai.chat.completions.create({

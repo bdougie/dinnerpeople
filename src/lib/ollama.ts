@@ -12,6 +12,30 @@ interface OllamaResponse {
   done: boolean;
 }
 
+/**
+ * Validates if a URL is from an allowed domain for Ollama processing
+ */
+function isAllowedOllamaUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const supabaseProjectId = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    
+    // Allow only URLs from our Supabase storage or local development
+    const allowedHosts = [
+      'localhost',
+      '127.0.0.1'
+    ];
+    
+    if (supabaseProjectId) {
+      allowedHosts.push(`${supabaseProjectId}.supabase.co`);
+    }
+    
+    return allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 
 class OllamaAPI {
   private baseUrl: string;
@@ -31,12 +55,23 @@ class OllamaAPI {
   }
 
   /**
-   * Convert an image URL to base64 for text prompt inclusion
+   * Convert an image URL to base64 for text prompt inclusion with security validation
    */
   private async imageUrlToBase64(url: string): Promise<string> {
+    // Validate URL before fetching
+    if (!isAllowedOllamaUrl(url)) {
+      throw new Error('[Security] Blocked fetch to non-allowed URL');
+    }
+    
     try {
       const response = await fetch(url);
       const blob = await response.blob();
+      
+      // Validate content type is an image
+      if (!blob.type.startsWith('image/')) {
+        throw new Error('[Security] Blocked non-image content type');
+      }
+      
       return await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
