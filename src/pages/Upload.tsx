@@ -236,283 +236,6 @@ export default function Upload() {
     };
   }, [recipeId]);
 
-  useEffect(() => {
-    if (
-      processingStatus?.status === "processing" &&
-      preview?.file &&
-      recipeId &&
-      !processingFrames
-    ) {
-      console.log(
-        "[DEBUG] Processing status changed to processing, starting frame extraction"
-      );
-      processVideoFrames(preview.file, recipeId);
-    }
-  }, [processingStatus, preview, recipeId, processingFrames, processVideoFrames]);
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(e.type === "dragenter" || e.type === "dragover");
-  }, []);
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    setError(null);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length) {
-      await handleFiles(files);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      setError(null);
-      const files = e.target.files;
-      if (files?.length) {
-        await handleFiles(Array.from(files));
-      }
-    },
-    [] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
-  const generateThumbnail = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const video = document.createElement("video");
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      };
-
-      video.onseeked = () => {
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL("image/jpeg", 0.8));
-        }
-      };
-
-      video.onerror = () => {
-        reject(new Error("Error loading video"));
-      };
-
-      video.src = URL.createObjectURL(file);
-      video.currentTime = 1;
-    });
-  };
-
-  const handleFiles = async (files: File[]) => {
-    const file = files[0];
-
-    if (!file) {
-      setError("No file provided");
-      return;
-    }
-    
-    // Show validation status
-    setShowValidationStatus(true);
-    
-    // Reset validation status
-    setValidationStatus({
-      apiKey: null,
-      fileSize: null,
-      fileType: null,
-      thumbnail: null,
-      frameExtraction: null,
-      embeddings: null,
-    });
-    
-    // Check API key
-    const hasApiKey = !!import.meta.env['VITE_OPENAI_API_KEY'];
-    setValidationStatus(prev => ({ ...prev, apiKey: hasApiKey }));
-    console.log('[DEBUG] API key validation:', hasApiKey);
-
-    // Validate file type
-    const isValidType = file.type.startsWith("video/");
-    setValidationStatus(prev => ({ ...prev, fileType: isValidType }));
-    
-    if (!isValidType) {
-      setError("Please upload a video file");
-      return;
-    }
-
-    // Validate file size
-    const isValidSize = file.size <= 200 * 1024 * 1024;
-    setValidationStatus(prev => ({ ...prev, fileSize: isValidSize }));
-    
-    if (!isValidSize) {
-      setError("File size must be less than 200MB");
-      return;
-    }
-
-    try {
-      console.log("[DEBUG] Starting thumbnail generation");
-      const thumbnailUrl = await generateThumbnail(file);
-      console.log("[DEBUG] Thumbnail generated successfully");
-      setValidationStatus(prev => ({ ...prev, thumbnail: true }));
-
-      setPreview({ file, thumbnailUrl });
-      
-      // Check if compression is needed
-      let fileToUpload = file;
-      if (isCompressionNeeded(file)) {
-        console.log("[DEBUG] Starting video compression");
-        setProcessingSteps((steps) =>
-          steps.map((step) => ({
-            ...step,
-            status: step.id === "compress" ? "current" : "waiting",
-          }))
-        );
-        
-        try {
-          fileToUpload = await compression.compress(file);
-          console.log("[DEBUG] Compression completed:", formatCompressionStats(file.size, fileToUpload.size));
-          
-          // Update compression step to completed
-          setProcessingSteps((steps) =>
-            steps.map((step) => ({
-              ...step,
-              status: step.id === "compress" ? "completed" : step.status,
-            }))
-          );
-        } catch (compressionError) {
-          console.error("[DEBUG] Compression failed, using original file:", compressionError);
-          // Continue with original file if compression fails
-          toast.error("Video optimization failed, uploading original file", {
-            duration: 4000,
-          });
-        }
-      } else {
-        // Skip compression step if not needed
-        setProcessingSteps((steps) =>
-          steps.filter((step) => step.id !== "compress")
-        );
-      }
-
-      console.log("[DEBUG] Starting video upload to Supabase");
-      setIsUploading(true);
-      
-      // Update upload step to current
-      setProcessingSteps((steps) =>
-        steps.map((step) => ({
-          ...step,
-          status: step.id === "upload" ? "current" : step.id === "compress" ? "completed" : step.status,
-        }))
-      );
-      
-      // Start upload progress tracking
-      uploadProgress.startUpload(fileToUpload.size);
-      
-      const result = await uploadVideo(fileToUpload, thumbnailUrl); // Pass the compressed file to upload
-      console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
-      setRecipeId(result.recipeId);
-      console.log("[DEBUG] RecipeId state updated:", result.recipeId);
-      
-      // Add to background uploads
-      // Note: The actual upload has already completed at this point,
-      // but we need to wait for frame processing. Set initial progress to 100%
-      addBackgroundUpload({
-        recipeId: result.recipeId,
-        fileName: file.name,
-        fileSize: fileToUpload.size,
-        progress: {
-          percentage: 100,
-          bytesUploaded: fileToUpload.size,
-          totalBytes: fileToUpload.size,
-          speed: 0,
-          timeRemaining: 0,
-        },
-        status: 'processing', // Changed to processing since upload is done
-        startedAt: new Date(),
-      });
-      
-      // Subscribe to upload progress updates
-      const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
-        uploadProgress.updateProgress(data.bytes_uploaded);
-        
-        // Update context progress only if still uploading
-        // Since upload is already done, we keep the processing status
-        if (data.status === 'completed') {
-          updateContextProgress(result.recipeId, {
-            progress: {
-              percentage: 100,
-              bytesUploaded: fileToUpload.size,
-              totalBytes: fileToUpload.size,
-              speed: 0,
-              timeRemaining: 0,
-            },
-            status: 'processing',
-          });
-        }
-        
-        if (data.status === 'completed') {
-          uploadProgress.completeUpload();
-        } else if (data.status === 'failed') {
-          uploadProgress.resetProgress();
-          setError(data.error || 'Upload failed');
-          updateContextProgress(result.recipeId, {
-            status: 'failed',
-            error: data.error,
-          });
-        }
-      });
-      setUploadChannel(channel);
-
-      // Set initial processing status from upload result to avoid waiting for realtime updates
-      if (result.processingStatus) {
-        console.log(
-          "[DEBUG] Setting initial processing status from upload result:",
-          result.processingStatus
-        );
-        setProcessingStatus({
-          status: result.processingStatus as
-            | "pending"
-            | "processing"
-            | "completed"
-            | "failed",
-        });
-      }
-
-      setIsUploading(false);
-      console.log("[DEBUG] Upload state set to false");
-    } catch (err) {
-      console.error("[DEBUG] Upload error:", err);
-      
-      // Update validation status for failure
-      if (err instanceof Error && err.message.includes('thumbnail')) {
-        setValidationStatus(prev => ({ ...prev, thumbnail: false }));
-      }
-
-      const errorMsg = err instanceof Error ? err.message : "Failed to process video";
-      
-      // Check for payload too large error
-      if (
-        errorMsg.includes("payload too large") ||
-        errorMsg.includes("request entity too large") ||
-        errorMsg.includes("413") ||
-        errorMsg.includes("size limit")
-      ) {
-        const errorMessage =
-          "Your video file is too large for upload. Please compress or resize it to a smaller file size.";
-        setError(errorMessage);
-        toast.error(errorMessage, {
-          duration: 6000,
-          icon: "⚠️",
-        });
-      } else {
-        setError(errorMsg);
-        toast.error(errorMsg);
-      }
-
-      setIsUploading(false);
-    }
-  };
-
   const processVideoFrames = useCallback(async (videoFile: File, recipeId: string) => {
     try {
       setProcessingFrames(true);
@@ -755,6 +478,284 @@ export default function Upload() {
       setProcessingFrames(false);
     }
   }, [updateContextProgress, activeUpload]);
+
+  useEffect(() => {
+    if (
+      processingStatus?.status === "processing" &&
+      preview?.file &&
+      recipeId &&
+      !processingFrames
+    ) {
+      console.log(
+        "[DEBUG] Processing status changed to processing, starting frame extraction"
+      );
+      processVideoFrames(preview.file, recipeId);
+    }
+  }, [processingStatus, preview, recipeId, processingFrames, processVideoFrames]);
+
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(e.type === "dragenter" || e.type === "dragover");
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    setError(null);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) {
+      await handleFiles(files);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      setError(null);
+      const files = e.target.files;
+      if (files?.length) {
+        await handleFiles(Array.from(files));
+      }
+    },
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const generateThumbnail = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video");
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      };
+
+      video.onseeked = () => {
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.8));
+        }
+      };
+
+      video.onerror = () => {
+        reject(new Error("Error loading video"));
+      };
+
+      video.src = URL.createObjectURL(file);
+      video.currentTime = 1;
+    });
+  };
+
+  const handleFiles = async (files: File[]) => {
+    const file = files[0];
+
+    if (!file) {
+      setError("No file provided");
+      return;
+    }
+    
+    // Show validation status
+    setShowValidationStatus(true);
+    
+    // Reset validation status
+    setValidationStatus({
+      apiKey: null,
+      fileSize: null,
+      fileType: null,
+      thumbnail: null,
+      frameExtraction: null,
+      embeddings: null,
+    });
+    
+    // Check API key
+    const hasApiKey = !!import.meta.env['VITE_OPENAI_API_KEY'];
+    setValidationStatus(prev => ({ ...prev, apiKey: hasApiKey }));
+    console.log('[DEBUG] API key validation:', hasApiKey);
+
+    // Validate file type
+    const isValidType = file.type.startsWith("video/");
+    setValidationStatus(prev => ({ ...prev, fileType: isValidType }));
+    
+    if (!isValidType) {
+      setError("Please upload a video file");
+      return;
+    }
+
+    // Validate file size
+    const isValidSize = file.size <= 200 * 1024 * 1024;
+    setValidationStatus(prev => ({ ...prev, fileSize: isValidSize }));
+    
+    if (!isValidSize) {
+      setError("File size must be less than 200MB");
+      return;
+    }
+
+    try {
+      console.log("[DEBUG] Starting thumbnail generation");
+      const thumbnailUrl = await generateThumbnail(file);
+      console.log("[DEBUG] Thumbnail generated successfully");
+      setValidationStatus(prev => ({ ...prev, thumbnail: true }));
+
+      setPreview({ file, thumbnailUrl });
+      
+      // Check if compression is needed
+      let fileToUpload = file;
+      if (isCompressionNeeded()) {
+        console.log("[DEBUG] Starting video compression");
+        setProcessingSteps((steps) =>
+          steps.map((step) => ({
+            ...step,
+            status: step.id === "compress" ? "current" : "waiting",
+          }))
+        );
+        
+        try {
+          fileToUpload = await compression.compress(file);
+          console.log("[DEBUG] Compression completed:", formatCompressionStats(file.size, fileToUpload.size));
+          
+          // Update compression step to completed
+          setProcessingSteps((steps) =>
+            steps.map((step) => ({
+              ...step,
+              status: step.id === "compress" ? "completed" : step.status,
+            }))
+          );
+        } catch (compressionError) {
+          console.error("[DEBUG] Compression failed, using original file:", compressionError);
+          // Continue with original file if compression fails
+          toast.error("Video optimization failed, uploading original file", {
+            duration: 4000,
+          });
+        }
+      } else {
+        // Skip compression step if not needed
+        setProcessingSteps((steps) =>
+          steps.filter((step) => step.id !== "compress")
+        );
+      }
+
+      console.log("[DEBUG] Starting video upload to Supabase");
+      setIsUploading(true);
+      
+      // Update upload step to current
+      setProcessingSteps((steps) =>
+        steps.map((step) => ({
+          ...step,
+          status: step.id === "upload" ? "current" : step.id === "compress" ? "completed" : step.status,
+        }))
+      );
+      
+      // Start upload progress tracking
+      uploadProgress.startUpload(fileToUpload.size);
+      
+      const result = await uploadVideo(fileToUpload, thumbnailUrl); // Pass the compressed file to upload
+      console.log("[DEBUG] Upload completed, recipeId:", result.recipeId);
+      setRecipeId(result.recipeId);
+      console.log("[DEBUG] RecipeId state updated:", result.recipeId);
+      
+      // Add to background uploads
+      // Note: The actual upload has already completed at this point,
+      // but we need to wait for frame processing. Set initial progress to 100%
+      addBackgroundUpload({
+        recipeId: result.recipeId,
+        fileName: file.name,
+        fileSize: fileToUpload.size,
+        progress: {
+          percentage: 100,
+          bytesUploaded: fileToUpload.size,
+          totalBytes: fileToUpload.size,
+          speed: 0,
+          timeRemaining: 0,
+        },
+        status: 'processing', // Changed to processing since upload is done
+        startedAt: new Date(),
+      });
+      
+      // Subscribe to upload progress updates
+      const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
+        uploadProgress.updateProgress(data.bytes_uploaded);
+        
+        // Update context progress only if still uploading
+        // Since upload is already done, we keep the processing status
+        if (data.status === 'completed') {
+          updateContextProgress(result.recipeId, {
+            progress: {
+              percentage: 100,
+              bytesUploaded: fileToUpload.size,
+              totalBytes: fileToUpload.size,
+              speed: 0,
+              timeRemaining: 0,
+            },
+            status: 'processing',
+          });
+        }
+        
+        if (data.status === 'completed') {
+          uploadProgress.completeUpload();
+        } else if (data.status === 'failed') {
+          uploadProgress.resetProgress();
+          setError(data.error || 'Upload failed');
+          updateContextProgress(result.recipeId, {
+            status: 'failed',
+            error: data.error,
+          });
+        }
+      });
+      setUploadChannel(channel);
+
+      // Set initial processing status from upload result to avoid waiting for realtime updates
+      if (result.processingStatus) {
+        console.log(
+          "[DEBUG] Setting initial processing status from upload result:",
+          result.processingStatus
+        );
+        setProcessingStatus({
+          status: result.processingStatus as
+            | "pending"
+            | "processing"
+            | "completed"
+            | "failed",
+        });
+      }
+
+      setIsUploading(false);
+      console.log("[DEBUG] Upload state set to false");
+    } catch (err) {
+      console.error("[DEBUG] Upload error:", err);
+      
+      // Update validation status for failure
+      if (err instanceof Error && err.message.includes('thumbnail')) {
+        setValidationStatus(prev => ({ ...prev, thumbnail: false }));
+      }
+
+      const errorMsg = err instanceof Error ? err.message : "Failed to process video";
+      
+      // Check for payload too large error
+      if (
+        errorMsg.includes("payload too large") ||
+        errorMsg.includes("request entity too large") ||
+        errorMsg.includes("413") ||
+        errorMsg.includes("size limit")
+      ) {
+        const errorMessage =
+          "Your video file is too large for upload. Please compress or resize it to a smaller file size.";
+        setError(errorMessage);
+        toast.error(errorMessage, {
+          duration: 6000,
+          icon: "⚠️",
+        });
+      } else {
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
+
+      setIsUploading(false);
+    }
+  };
+
 
   // Add a useEffect that will check processing status periodically if realtime updates fail
   useEffect(() => {
