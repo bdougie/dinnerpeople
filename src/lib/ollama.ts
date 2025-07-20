@@ -18,19 +18,37 @@ interface OllamaResponse {
 function isAllowedOllamaUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    const supabaseProjectId = import.meta.env['VITE_SUPABASE_URL']?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    const supabaseUrl = import.meta.env['VITE_SUPABASE_URL'];
     
-    // Allow only URLs from our Supabase storage or local development
-    const allowedHosts = [
-      'localhost',
-      '127.0.0.1'
-    ];
-    
-    if (supabaseProjectId) {
-      allowedHosts.push(`${supabaseProjectId}.supabase.co`);
+    if (!supabaseUrl) {
+      // If no Supabase URL, only allow localhost
+      return parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
     }
     
-    return allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+    // Parse the Supabase project URL
+    const supabaseUrlObj = new URL(supabaseUrl);
+    const supabaseHost = supabaseUrlObj.hostname;
+    
+    // Strict validation: only allow exact matches
+    const allowedHosts = new Set([
+      supabaseHost,
+      'localhost',
+      '127.0.0.1'
+    ]);
+    
+    // Check exact hostname match
+    if (!allowedHosts.has(parsedUrl.hostname)) {
+      return false;
+    }
+    
+    // Additional validation for Supabase URLs - must be storage endpoints
+    if (parsedUrl.hostname === supabaseHost) {
+      // Must be a storage URL path
+      return parsedUrl.pathname.startsWith('/storage/v1/object/public/');
+    }
+    
+    // For localhost/127.0.0.1, allow any path
+    return true;
   } catch {
     return false;
   }
@@ -64,7 +82,15 @@ class OllamaAPI {
     }
     
     try {
-      const response = await fetch(url);
+      // Create a new URL object to ensure it's properly formed
+      const validatedUrl = new URL(url);
+      
+      // Double-check the URL is still allowed after parsing
+      if (!isAllowedOllamaUrl(validatedUrl.toString())) {
+        throw new Error('URL validation failed after parsing');
+      }
+      
+      const response = await fetch(validatedUrl.toString());
       const blob = await response.blob();
       
       // Validate content type is an image

@@ -15,19 +15,34 @@ const openai = new OpenAI({
 function isAllowedSupabaseUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    const supabaseProjectId = import.meta.env['VITE_SUPABASE_URL']?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    const supabaseUrl = import.meta.env['VITE_SUPABASE_URL'];
     
-    if (!supabaseProjectId) return false;
+    if (!supabaseUrl) return false;
     
-    // Allow only URLs from our Supabase storage
-    const allowedHosts = [
-      `${supabaseProjectId}.supabase.co`,
-      // Local development URLs that are already validated by our app
+    // Parse the Supabase project URL
+    const supabaseUrlObj = new URL(supabaseUrl);
+    const supabaseHost = supabaseUrlObj.hostname;
+    
+    // Strict validation: only allow exact matches
+    const allowedHosts = new Set([
+      supabaseHost,
       'localhost',
       '127.0.0.1'
-    ];
+    ]);
     
-    return allowedHosts.some(host => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+    // Check exact hostname match
+    if (!allowedHosts.has(parsedUrl.hostname)) {
+      return false;
+    }
+    
+    // Additional validation for Supabase URLs - must be storage endpoints
+    if (parsedUrl.hostname === supabaseHost) {
+      // Must be a storage URL path
+      return parsedUrl.pathname.startsWith('/storage/v1/object/public/');
+    }
+    
+    // For localhost/127.0.0.1, allow any path
+    return true;
   } catch {
     return false;
   }
@@ -44,7 +59,15 @@ async function safeImageToBase64(imageUrl: string): Promise<string | null> {
   }
   
   try {
-    const response = await fetch(imageUrl);
+    // Create a new URL object to ensure it's properly formed
+    const validatedUrl = new URL(imageUrl);
+    
+    // Double-check the URL is still allowed after parsing
+    if (!isAllowedSupabaseUrl(validatedUrl.toString())) {
+      throw new Error('URL validation failed after parsing');
+    }
+    
+    const response = await fetch(validatedUrl.toString());
     const blob = await response.blob();
     
     // Validate content type is an image
