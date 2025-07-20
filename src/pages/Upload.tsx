@@ -438,7 +438,7 @@ export default function Upload() {
         // Update context progress only if still uploading
         // Since upload is already done, we keep the processing status
         if (data.status === 'completed') {
-          uploadContextProgress(result.recipeId, {
+          updateContextProgress(result.recipeId, {
             progress: {
               percentage: 100,
               bytesUploaded: fileToUpload.size,
