@@ -157,20 +157,28 @@ export const useAuthStore = create<AuthState>((set) => ({
   resetPasswordForEmail: async (email) => {
     try {
       set({ loading: true, error: null, successMessage: null });
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      
+      console.log('[DEBUG] Attempting password reset for:', email);
+      console.log('[DEBUG] Redirect URL:', `${window.location.origin}/auth/reset-password`);
+      
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
       
+      console.log('[DEBUG] Reset password response:', { data, error });
+      
       if (error) {
+        console.error('[DEBUG] Reset password error:', error);
         throw error;
       }
       
       set({ 
-        successMessage: `Password reset link sent to ${email}. Please check your email.`,
+        successMessage: `Password reset link sent to ${email}. Please check your email (Mailpit at http://localhost:54324).`,
         error: null 
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      console.error('[DEBUG] Reset password exception:', error);
       set({ error: errorMessage, successMessage: null });
       throw error;
     } finally {

@@ -10,6 +10,13 @@ export default function TestDB() {
   const updatePasswordForAdmin = async () => {
     setLoading(true);
     try {
+      // First check if user is logged in
+      if (!user) {
+        setResults('Error: You must be logged in to update password');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.auth.updateUser({
         password: 'hejco1-Kumbyk-cemcus'
       });
@@ -17,10 +24,63 @@ export default function TestDB() {
       if (error) {
         setResults(`Error updating password: ${error.message}`);
       } else {
-        setResults('Password updated successfully for ' + user?.email);
+        setResults(`✅ Password updated successfully for ${user.email}!\n\nYour new password is: hejco1-Kumbyk-cemcus\n\nYou can now use this password to log in.`);
       }
     } catch (error) {
       setResults(`Unexpected error: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkInbucket = () => {
+    window.open('http://localhost:54324', '_blank');
+    setResults('Mailpit opened in new tab. Look for emails sent to ' + user?.email);
+  };
+
+  const testPasswordReset = async () => {
+    setLoading(true);
+    try {
+      const email = 'ilikerobot@gmail.com';
+      setResults(`Testing password reset for ${email}...\n\n`);
+      
+      // First check if user exists
+      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+      
+      if (listError) {
+        // Try non-admin approach
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        });
+        
+        setResults(prev => prev + `Reset attempt response:\n${JSON.stringify({ data, error }, null, 2)}\n\n`);
+        
+        if (!error) {
+          setResults(prev => prev + `✅ Reset email should be sent! Check Mailpit at http://localhost:54324`);
+        } else {
+          setResults(prev => prev + `❌ Error: ${error.message}`);
+        }
+      } else {
+        const userExists = users?.some(u => u.email === email);
+        setResults(prev => prev + `User ${email} exists: ${userExists}\n\n`);
+        
+        if (!userExists) {
+          setResults(prev => prev + `❌ User not found! You may need to create the account first.`);
+        } else {
+          // Try to send reset
+          const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/auth/reset-password`,
+          });
+          
+          setResults(prev => prev + `Reset attempt response:\n${JSON.stringify({ data, error }, null, 2)}\n\n`);
+          
+          if (!error) {
+            setResults(prev => prev + `✅ Reset email should be sent! Check Mailpit at http://localhost:54324`);
+          }
+        }
+      }
+    } catch (error) {
+      setResults(`Error during test: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -133,6 +193,21 @@ export default function TestDB() {
           className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
         >
           {loading ? 'Updating...' : 'Update Password'}
+        </button>
+        
+        <button
+          onClick={checkInbucket}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+        >
+          Check Email (Mailpit)
+        </button>
+        
+        <button
+          onClick={testPasswordReset}
+          disabled={loading}
+          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+        >
+          {loading ? 'Testing...' : 'Test Password Reset'}
         </button>
       </div>
       
