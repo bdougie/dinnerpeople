@@ -93,7 +93,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       dimensions: 1536 // Explicitly set to match our database column
     });
     
-    const embedding = response.data[0].embedding;
+    const embedding = response.data[0]?.embedding || [];
     console.log(`[DEBUG] Generated embedding successfully with ${embedding.length} dimensions`);
     return embedding;
   } catch (error) {

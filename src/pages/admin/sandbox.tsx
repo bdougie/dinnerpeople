@@ -405,8 +405,9 @@ const AdminSandbox: React.FC = () => {
     
     try {
       // Use a sample image URL if no frame is selected
-      const imageUrl = selectedFrameId && getSelectedFrame() 
-        ? getSelectedFrame().image_url 
+      const selectedFrame = getSelectedFrame();
+      const imageUrl = selectedFrameId && selectedFrame 
+        ? selectedFrame.image_url 
         : 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800'; // Sample cooking image
       
       if (useOpenAI) {
@@ -821,7 +822,7 @@ const AdminSandbox: React.FC = () => {
               <div className="bg-gray-50 p-3 rounded overflow-auto max-h-96">
                 {frameResults.map((frame, i) => (
                   <div key={i} className="mb-3 p-2 border-b flex">
-                    {frame.image_url && (
+                    {frame && frame.image_url && (
                       <div className="mr-3">
                         <img
                           src={frame.image_url}

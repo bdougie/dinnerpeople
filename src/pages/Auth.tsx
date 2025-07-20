@@ -10,7 +10,7 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, resetPasswordForEmail, error, successMessage, clearError, clearMessages } = useAuthStore();
+  const { signIn, signUp, resetPasswordForEmail, error, successMessage, clearMessages } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {

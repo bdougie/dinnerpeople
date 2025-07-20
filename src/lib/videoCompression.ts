@@ -35,7 +35,7 @@ export async function compressVideo(
     const ffmpeg = await initializeFFmpeg();
     
     // Set up progress tracking with timeout
-    let progressTimeout: NodeJS.Timeout;
+    let progressTimeout: NodeJS.Timeout | undefined;
     let lastProgress = 0;
     const PROGRESS_TIMEOUT = 30000; // 30 seconds without progress
     
@@ -135,7 +135,7 @@ function formatFileSize(bytes: number): string {
   return `${mb.toFixed(1)}MB`;
 }
 
-export function isCompressionNeeded(file: File): boolean {
+export function isCompressionNeeded(_file: File): boolean {
   // TODO: Re-enable compression after fixing FFmpeg.wasm issues
   // See: https://github.com/bdougie/dinnerpeople/issues/25
   // Temporarily disabled - always return false

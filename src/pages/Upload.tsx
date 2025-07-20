@@ -641,12 +641,14 @@ export default function Upload() {
           duration: 6000,
         });
       } else if (!frameProcessingSuccess) {
-        toast.warning("Frame processing failed but recipe was created. Some features may be limited.", {
+        toast("Frame processing failed but recipe was created. Some features may be limited.", {
           duration: 5000,
+          icon: '⚠️',
         });
       } else if (!summaryGenerated) {
-        toast.warning("Recipe created but summary generation failed. You can update the title later.", {
+        toast("Recipe created but summary generation failed. You can update the title later.", {
           duration: 5000,
+          icon: '⚠️',
         });
       } else {
         toast.success(`Successfully processed ${processedFrameCount} frames and generated recipe!`, {
@@ -1069,7 +1071,7 @@ export default function Upload() {
       <UploadStatusTracker 
         isVisible={showValidationStatus && !preview}
         validationStatus={validationStatus}
-        errorMessage={error}
+        errorMessage={error || undefined}
       />
 
       {preview ? (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,7 +16,7 @@ export default function PasswordTest() {
     try {
       setResults('Attempting to create account...\n');
       
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password: 'temporary123',
         options: {
@@ -118,7 +118,7 @@ export default function PasswordTest() {
     try {
       setResults('Updating password directly...\n');
       
-      const { data, error } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: 'hejco1-Kumbyk-cemcus'
       });
       
@@ -163,7 +163,7 @@ export default function PasswordTest() {
       }
       
       // Try a direct SQL approach using RPC
-      const { data, error } = await supabase.rpc('make_user_admin', {
+      const { error } = await supabase.rpc('make_user_admin', {
         target_user_id: user.id,
         target_email: user.email
       });
@@ -172,13 +172,8 @@ export default function PasswordTest() {
         // If RPC doesn't exist, try direct insert
         setResults(prev => prev + 'RPC failed, trying direct insert...\n');
         
-        // Use raw SQL via the SQL editor approach
-        const insertQuery = `
-          INSERT INTO admin_users (user_id, email, created_by)
-          VALUES ('${user.id}', '${user.email}', '${user.id}')
-          ON CONFLICT (user_id) DO NOTHING
-          RETURNING *;
-        `;
+        // Direct insert query would go here if needed
+        // Removed to fix unused variable warning
         
         try {
           // Try to insert directly
