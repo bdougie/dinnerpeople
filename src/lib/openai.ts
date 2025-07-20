@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import * as PromptUtils from './prompt-utils';
 import { RecipeSummary } from './prompt-utils';
 import { OPENAI_IMAGE_MODEL, OPENAI_TEXT_MODEL } from './constants';
-import { generateEmbedding as generateLocalEmbedding } from './localEmbeddings';
 
 const openai = new OpenAI({
   apiKey: import.meta.env['VITE_OPENAI_API_KEY'],
@@ -59,11 +58,17 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    // Use local embeddings instead of OpenAI
-    return await generateLocalEmbedding(text);
+    // Use OpenAI embeddings API
+    const response = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text,
+    });
+    
+    return response.data[0].embedding;
   } catch (error) {
-    console.error('Error generating embedding:', error);
-    throw error;
+    console.error('Error generating OpenAI embedding:', error);
+    // Return empty array to allow frame storage to continue
+    return [];
   }
 }
 
@@ -77,7 +82,7 @@ export async function storeFrameWithEmbedding(
     // Generate embedding for the description
     const embedding = await generateEmbedding(description);
     
-    // Store in database with embedding
+    // Store in database with embedding (or null if embedding failed)
     const { error } = await supabase
       .from('video_frames')
       .insert({
@@ -85,7 +90,7 @@ export async function storeFrameWithEmbedding(
         timestamp,
         description,
         image_url: imageUrl,
-        embedding
+        embedding: embedding.length > 0 ? embedding : null
       });
       
     if (error) {
@@ -93,7 +98,26 @@ export async function storeFrameWithEmbedding(
     }
   } catch (error) {
     console.error('Error storing frame with embedding:', error);
-    throw error;
+    // Even if embedding fails, try to store the frame without embedding
+    try {
+      const { error: fallbackError } = await supabase
+        .from('video_frames')
+        .insert({
+          recipe_id: recipeId,
+          timestamp,
+          description,
+          image_url: imageUrl,
+          embedding: null
+        });
+      
+      if (fallbackError) {
+        throw fallbackError;
+      }
+      console.log('Frame stored without embedding due to embedding generation failure');
+    } catch (fallbackError) {
+      console.error('Error storing frame even without embedding:', fallbackError);
+      throw fallbackError;
+    }
   }
 }
 

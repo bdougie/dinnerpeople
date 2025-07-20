@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { generateEmbedding } from './localEmbeddings';
+import { generateEmbedding } from './openai';
 
 // SQL to create the search_recipes function (renamed from match_recipes)
 export const createMatchRecipesFunction = `

@@ -375,12 +375,20 @@ export default function Upload() {
       console.log("[DEBUG] RecipeId state updated:", result.recipeId);
       
       // Add to background uploads
+      // Note: The actual upload has already completed at this point,
+      // but we need to wait for frame processing. Set initial progress to 100%
       addBackgroundUpload({
         recipeId: result.recipeId,
         fileName: file.name,
         fileSize: fileToUpload.size,
-        progress: uploadProgress.progress,
-        status: 'uploading',
+        progress: {
+          percentage: 100,
+          bytesUploaded: fileToUpload.size,
+          totalBytes: fileToUpload.size,
+          speed: 0,
+          timeRemaining: 0,
+        },
+        status: 'processing', // Changed to processing since upload is done
         startedAt: new Date(),
       });
       
@@ -388,11 +396,20 @@ export default function Upload() {
       const channel = subscribeToUploadProgress(result.recipeId, (data: UploadProgressData) => {
         uploadProgress.updateProgress(data.bytes_uploaded);
         
-        // Update context progress
-        updateContextProgress(result.recipeId, {
-          progress: uploadProgress.progress,
-          status: data.status === 'completed' ? 'processing' : 'uploading',
-        });
+        // Update context progress only if still uploading
+        // Since upload is already done, we keep the processing status
+        if (data.status === 'completed') {
+          uploadContextProgress(result.recipeId, {
+            progress: {
+              percentage: 100,
+              bytesUploaded: fileToUpload.size,
+              totalBytes: fileToUpload.size,
+              speed: 0,
+              timeRemaining: 0,
+            },
+            status: 'processing',
+          });
+        }
         
         if (data.status === 'completed') {
           uploadProgress.completeUpload();
