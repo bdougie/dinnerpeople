@@ -15,5 +15,16 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Ensure workers are handled correctly
+        format: 'es'
+      }
+    }
+  },
+  worker: {
+    format: 'es'
   }
 });
