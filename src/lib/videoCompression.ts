@@ -1,16 +1,30 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
-
-let ffmpeg: FFmpeg | null = null;
+// Dynamic imports to avoid build issues with FFmpeg in Vite 7
+let ffmpeg: any = null;
+let FFmpegModule: any = null;
+let FFmpegUtil: any = null;
 
 interface CompressionOptions {
   targetSizeMB?: number;
   onProgress?: (progress: number) => void;
 }
 
-export async function initializeFFmpeg(): Promise<FFmpeg> {
+async function loadFFmpegModules() {
+  if (!FFmpegModule || !FFmpegUtil) {
+    // Dynamically import FFmpeg modules only when needed
+    const [ffmpegModule, utilModule] = await Promise.all([
+      import('@ffmpeg/ffmpeg'),
+      import('@ffmpeg/util')
+    ]);
+    FFmpegModule = ffmpegModule;
+    FFmpegUtil = utilModule;
+  }
+  return { FFmpeg: FFmpegModule.FFmpeg, fetchFile: FFmpegUtil.fetchFile, toBlobURL: FFmpegUtil.toBlobURL };
+}
+
+export async function initializeFFmpeg(): Promise<any> {
   if (ffmpeg) return ffmpeg;
   
+  const { FFmpeg, toBlobURL } = await loadFFmpegModules();
   ffmpeg = new FFmpeg();
   
   const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
@@ -31,6 +45,9 @@ export async function compressVideo(
   const { onProgress } = options;
   
   try {
+    // Load FFmpeg modules dynamically
+    const { fetchFile } = await loadFFmpegModules();
+    
     // Initialize FFmpeg if not already done
     const ffmpeg = await initializeFFmpeg();
     
@@ -46,7 +63,7 @@ export async function compressVideo(
       }, PROGRESS_TIMEOUT);
     };
     
-    ffmpeg.on('progress', ({ progress }) => {
+    ffmpeg.on('progress', ({ progress }: { progress: number }) => {
       const currentProgress = Math.round(progress * 100);
       if (currentProgress > lastProgress) {
         lastProgress = currentProgress;

@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    exclude: ['lucide-react', '@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
   server: {
     proxy: {
@@ -20,7 +20,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Ensure workers are handled correctly
-        format: 'es'
+        format: 'es',
+        manualChunks: (id) => {
+          // Separate FFmpeg into its own chunk
+          if (id.includes('@ffmpeg')) {
+            return 'ffmpeg';
+          }
+        }
       }
     }
   },
