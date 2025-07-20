@@ -242,9 +242,6 @@ const AdminSandbox: React.FC = () => {
   };
 
   const testFrameAnalysis = async () => {
-    const selectedFrame = getSelectedFrame();
-    if (!selectedFrame) return;
-
     setIsTestingFrame(true);
     setFrameAnalysisTime(null);
     const startTime = Date.now();
@@ -252,10 +249,15 @@ const AdminSandbox: React.FC = () => {
     try {
       let result: string;
       
+      // Use selected frame or a sample image
+      const selectedFrame = getSelectedFrame();
+      const imageUrl = selectedFrame?.image_url || 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800';
+      
       if (useOpenAI) {
         // Use OpenAI directly for better control and timing
         console.log('Using OpenAI for frame analysis...');
-        result = await openai.analyzeFrame(selectedFrame.image_url, framePrompt);
+        console.log('Image URL:', imageUrl);
+        result = await openai.analyzeFrame(imageUrl, framePrompt);
       } else {
         // Use Ollama through the API endpoint
         console.log('Using Ollama for frame analysis...');
@@ -263,7 +265,7 @@ const AdminSandbox: React.FC = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: selectedFrame.image_url,
+            imageUrl: imageUrl,
             prompt: framePrompt,
             model: selectedVisionModel, // Use selected vision model
           }),
@@ -294,8 +296,6 @@ const AdminSandbox: React.FC = () => {
   };
 
   const testRecipeSummary = async () => {
-    if (!selectedVideoId || frames.length === 0) return;
-
     setIsTestingRecipe(true);
     setRecipeSummaryTime(null);
     const startTime = Date.now();
@@ -304,13 +304,16 @@ const AdminSandbox: React.FC = () => {
       let result;
       
       if (useOpenAI) {
-        // Use OpenAI directly for better control and timing
+        // Use OpenAI directly for recipe summary
         console.log('Using OpenAI for recipe summary...');
-        const cookingSteps = frames
-          .map((frame) => `${frame.timestamp}s: ${frame.description || "No description available"}`)
-          .join('\n');
         
-        result = await openai.generateRecipeSummaryWithCustomPrompt(cookingSteps, recipePrompt);
+        // Create mock cooking steps if no frames available
+        const cookingSteps = frames.length > 0 
+          ? frames.map((frame) => `${frame.timestamp}s: ${frame.description || "Frame at ${frame.timestamp}s"}`).join('\n')
+          : "0s: Starting to prepare ingredients\n5s: Chopping vegetables\n10s: Heating oil in pan\n15s: Adding ingredients to pan\n20s: Stirring and cooking";
+        
+        const promptWithSteps = recipePrompt.replace('{steps}', cookingSteps);
+        result = await openai.generateRecipeSummaryWithCustomPrompt(cookingSteps, promptWithSteps);
       } else {
         // Use Ollama through the API endpoint
         console.log('Using Ollama for recipe summary...');
@@ -387,30 +390,48 @@ const AdminSandbox: React.FC = () => {
   };
 
   const testSocialDetection = async () => {
-    const selectedFrame = getSelectedFrame();
-    if (!selectedFrame) return;
-
     setIsTestingSocial(true);
+    const startTime = Date.now();
+    
     try {
-      const response = await fetch("/api/admin/test-social-detection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: selectedFrame.image_url,
-          prompt: socialPrompt,
-          model: selectedVisionModel, // Use selected vision model
-        }),
-      });
+      // Use a sample image URL if no frame is selected
+      const imageUrl = selectedFrameId && getSelectedFrame() 
+        ? getSelectedFrame().image_url 
+        : 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800'; // Sample cooking image
+      
+      if (useOpenAI) {
+        // Use OpenAI directly for social detection
+        console.log('Using OpenAI for social detection...');
+        const result = await openai.analyzeFrame(imageUrl, socialPrompt);
+        
+        const elapsed = Date.now() - startTime;
+        setSocialResult(`${result}\n\n⏱️ Processing time: ${elapsed}ms (${(elapsed/1000).toFixed(2)}s)`);
+        console.log(`Social detection completed in ${elapsed}ms`);
+      } else {
+        // Use Ollama through API
+        console.log('Using Ollama for social detection...');
+        const response = await fetch("/api/admin/test-social-detection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: imageUrl,
+            prompt: socialPrompt,
+            model: selectedVisionModel,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Server responded with ${response.status}: ${errorText}`
-        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Server responded with ${response.status}: ${errorText}`
+          );
+        }
+
+        const result = await response.json();
+        const elapsed = Date.now() - startTime;
+        setSocialResult(`${result.socialHandles || "No social handles detected"}\n\n⏱️ Processing time: ${elapsed}ms (${(elapsed/1000).toFixed(2)}s)`);
+        console.log(`Social detection completed in ${elapsed}ms`);
       }
-
-      const result = await response.json();
-      setSocialResult(result.socialHandles || "No social handles detected");
     } catch (error) {
       console.error("Error testing social detection:", error);
       if (error instanceof Error) {
@@ -1040,6 +1061,9 @@ const AdminSandbox: React.FC = () => {
         {/* Frame Analysis Panel */}
         <div className="border rounded p-4">
           <h2 className="text-lg font-semibold mb-2">Frame Analysis</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            {selectedFrameId ? "Selected frame will be analyzed" : "No frame selected - will use a sample image"}
+          </p>
           <textarea
             value={framePrompt}
             onChange={(e) => setFramePrompt(e.target.value)}
@@ -1047,7 +1071,7 @@ const AdminSandbox: React.FC = () => {
           />
           <button
             onClick={testFrameAnalysis}
-            disabled={isTestingFrame || !selectedFrameId}
+            disabled={isTestingFrame}
             className="mt-2 px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-400"
           >
             {isTestingFrame ? "Testing..." : "Test Frame Analysis"}
@@ -1067,6 +1091,9 @@ const AdminSandbox: React.FC = () => {
         {/* Recipe Summary Panel */}
         <div className="border rounded p-4">
           <h2 className="text-lg font-semibold mb-2">Recipe Summary</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            {frames.length > 0 ? `Will analyze ${frames.length} frames` : "No frames loaded - will use sample cooking steps"}
+          </p>
           <textarea
             value={recipePrompt}
             onChange={(e) => setRecipePrompt(e.target.value)}
@@ -1074,7 +1101,7 @@ const AdminSandbox: React.FC = () => {
           />
           <button
             onClick={testRecipeSummary}
-            disabled={isTestingRecipe || !selectedVideoId}
+            disabled={isTestingRecipe}
             className="mt-2 px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-400"
           >
             {isTestingRecipe ? "Testing..." : "Test Recipe Summary"}
@@ -1094,6 +1121,9 @@ const AdminSandbox: React.FC = () => {
         {/* Social Media Detection Panel */}
         <div className="border rounded p-4">
           <h2 className="text-lg font-semibold mb-2">Social Media Detection</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            {selectedFrameId ? "Selected frame will be analyzed" : "No frame selected - will use a sample image"}
+          </p>
           <textarea
             value={socialPrompt}
             onChange={(e) => setSocialPrompt(e.target.value)}
@@ -1101,7 +1131,7 @@ const AdminSandbox: React.FC = () => {
           />
           <button
             onClick={testSocialDetection}
-            disabled={isTestingSocial || !selectedFrameId}
+            disabled={isTestingSocial}
             className="mt-2 px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-400"
           >
             {isTestingSocial ? "Testing..." : "Test Social Detection"}
