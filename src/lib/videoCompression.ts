@@ -1,16 +1,33 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+// Dynamic imports to avoid build issues with FFmpeg in Vite 7
+import type { FFmpeg } from '@ffmpeg/ffmpeg';
+import type { fetchFile as FetchFileType, toBlobURL as ToBlobURLType } from '@ffmpeg/util';
 
 let ffmpeg: FFmpeg | null = null;
+let FFmpegModule: { FFmpeg: typeof FFmpeg } | null = null;
+let FFmpegUtil: { fetchFile: typeof FetchFileType; toBlobURL: typeof ToBlobURLType } | null = null;
 
 interface CompressionOptions {
   targetSizeMB?: number;
   onProgress?: (progress: number) => void;
 }
 
+async function loadFFmpegModules() {
+  if (!FFmpegModule || !FFmpegUtil) {
+    // Dynamically import FFmpeg modules only when needed
+    const [ffmpegModule, utilModule] = await Promise.all([
+      import('@ffmpeg/ffmpeg'),
+      import('@ffmpeg/util')
+    ]);
+    FFmpegModule = ffmpegModule;
+    FFmpegUtil = utilModule;
+  }
+  return { FFmpeg: FFmpegModule.FFmpeg, fetchFile: FFmpegUtil.fetchFile, toBlobURL: FFmpegUtil.toBlobURL };
+}
+
 export async function initializeFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg) return ffmpeg;
   
+  const { FFmpeg, toBlobURL } = await loadFFmpegModules();
   ffmpeg = new FFmpeg();
   
   const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
@@ -31,22 +48,47 @@ export async function compressVideo(
   const { onProgress } = options;
   
   try {
+    // Load FFmpeg modules dynamically
+    const { fetchFile } = await loadFFmpegModules();
+    
     // Initialize FFmpeg if not already done
     const ffmpeg = await initializeFFmpeg();
     
-    // Set up progress tracking
-    ffmpeg.on('progress', ({ progress }) => {
-      if (onProgress) {
-        // FFmpeg progress is 0-1, convert to percentage
-        onProgress(Math.round(progress * 100));
+    // Set up progress tracking with timeout
+    let progressTimeout: NodeJS.Timeout | undefined;
+    let lastProgress = 0;
+    const PROGRESS_TIMEOUT = 30000; // 30 seconds without progress
+    
+    const resetProgressTimeout = () => {
+      if (progressTimeout) clearTimeout(progressTimeout);
+      progressTimeout = setTimeout(() => {
+        throw new Error('Compression timed out - no progress for 30 seconds');
+      }, PROGRESS_TIMEOUT);
+    };
+    
+    ffmpeg.on('progress', (event: { progress: number }) => {
+      const currentProgress = Math.round(event.progress * 100);
+      if (currentProgress > lastProgress) {
+        lastProgress = currentProgress;
+        resetProgressTimeout();
+        if (onProgress) {
+          onProgress(currentProgress);
+        }
       }
     });
+    
+    // Start timeout
+    resetProgressTimeout();
     
     // Write input file to FFmpeg filesystem
     const inputFileName = 'input.mp4';
     const outputFileName = 'output.mp4';
     
+    if (onProgress) onProgress(5); // Show initial progress
+    
     await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+    
+    if (onProgress) onProgress(10); // Update after file write
     
     // Calculate target bitrate based on file size
     // Get video duration first with a quick probe
@@ -79,7 +121,6 @@ export async function compressVideo(
       outputFileName
     ];
     
-    console.log('Starting video compression with settings:', compressionArgs.join(' '));
     
     // Execute compression
     await ffmpeg.exec(compressionArgs);
@@ -91,11 +132,8 @@ export async function compressVideo(
     const blob = new Blob([data], { type: 'video/mp4' });
     const compressedFile = new File([blob], file.name, { type: 'video/mp4' });
     
-    // Log compression results
-    const compressionRatio = ((file.size - compressedFile.size) / file.size) * 100;
-    console.log(`Compression complete: ${formatFileSize(file.size)} → ${formatFileSize(compressedFile.size)} (${compressionRatio.toFixed(1)}% reduction)`);
-    
     // Clean up
+    if (progressTimeout) clearTimeout(progressTimeout);
     await ffmpeg.deleteFile(inputFileName);
     await ffmpeg.deleteFile(outputFileName);
     
@@ -106,15 +144,15 @@ export async function compressVideo(
   }
 }
 
-function formatFileSize(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)}MB`;
-}
-
-export function isCompressionNeeded(file: File): boolean {
-  // Don't compress if already under 50MB
-  const fileSizeMB = file.size / (1024 * 1024);
-  return fileSizeMB > 50;
+export function isCompressionNeeded(): boolean {
+  // TODO: Re-enable compression after fixing FFmpeg.wasm issues
+  // See: https://github.com/bdougie/dinnerpeople/issues/25
+  // Temporarily disabled - always return false
+  return false;
+  
+  // Original logic:
+  // const fileSizeMB = file.size / (1024 * 1024);
+  // return fileSizeMB > 50;
 }
 
 export function estimateCompressionTime(fileSizeMB: number): number {

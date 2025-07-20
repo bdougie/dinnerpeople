@@ -6,18 +6,22 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
+  successMessage: string | null;
   initializeAuth: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
+  resetPasswordForEmail: (email: string) => Promise<void>;
   clearError: () => void;
+  clearMessages: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: true,
   error: null,
+  successMessage: null,
   
   initializeAuth: async () => {
     try {
@@ -150,7 +154,34 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: false });
     }
   },
-  clearError: () => set({ error: null })
+  resetPasswordForEmail: async (email) => {
+    try {
+      set({ loading: true, error: null, successMessage: null });
+      
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      
+      
+      if (error) {
+        throw error;
+      }
+      
+      set({ 
+        successMessage: `Password reset link sent to ${email}. Please check your email (Mailpit at http://localhost:54324).`,
+        error: null 
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      set({ error: errorMessage, successMessage: null });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  clearError: () => set({ error: null }),
+  clearMessages: () => set({ error: null, successMessage: null })
 }));
 
 // Set up auth state listener

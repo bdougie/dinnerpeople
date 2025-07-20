@@ -117,9 +117,9 @@ export async function uploadVideoWithRealtimeProgress(
       await updateUploadProgress(
         recipeId,
         Math.min(progress, 95), // Cap at 95% until confirmed
-        uploadedBytes,
+        Math.round(uploadedBytes), // Round to whole number for bigint column
         totalSize,
-        speed
+        Math.round(speed) // Round speed to whole number
       );
     }, 500); // Update every 500ms
 

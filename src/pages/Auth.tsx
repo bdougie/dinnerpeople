@@ -6,28 +6,33 @@ import { motion } from 'framer-motion';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, error, clearError } = useAuthStore();
+  const { signIn, signUp, resetPasswordForEmail, error, successMessage, clearMessages } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    clearError();
-  }, [isLogin, clearError]);
+    clearMessages();
+  }, [isLogin, isForgotPassword, clearMessages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    clearError();
+    clearMessages();
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        await resetPasswordForEmail(email);
+        // Don't navigate away on success, show the success message
+      } else if (isLogin) {
         await signIn(email, password);
+        navigate('/');
       } else {
         await signUp(email, password);
+        navigate('/');
       }
-      navigate('/');
     } catch (error) {
       console.error('Authentication error:', error);
     } finally {
@@ -48,7 +53,7 @@ export default function Auth() {
             DP-O
           </h2>
           <p className="mt-2 text-center text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400">
-            {isLogin ? 'Welcome back' : 'Create account'}
+            {isForgotPassword ? 'Reset password' : isLogin ? 'Welcome back' : 'Create account'}
           </p>
         </div>
         
@@ -56,6 +61,12 @@ export default function Auth() {
           {error && (
             <div className="text-sm text-red-600 dark:text-red-400 text-center bg-red-50 dark:bg-red-900/10 p-3 rounded-lg">
               {error}
+            </div>
+          )}
+          
+          {successMessage && (
+            <div className="text-sm text-green-600 dark:text-green-400 text-center bg-green-50 dark:bg-green-900/10 p-3 rounded-lg">
+              {successMessage}
             </div>
           )}
           
@@ -73,25 +84,27 @@ export default function Auth() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div>
-              <label htmlFor="password" className="block text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              {!isLogin && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Password must be at least 6 characters
-                </p>
-              )}
-            </div>
+            {!isForgotPassword && (
+              <div>
+                <label htmlFor="password" className="block text-sm tracking-wider uppercase text-gray-500 dark:text-gray-400 mb-1">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  minLength={6}
+                  className="input-control dark:bg-dark-200 dark:border-dark-300 dark:text-white dark:focus:border-white"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {!isLogin && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Password must be at least 6 characters
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <button 
@@ -105,23 +118,53 @@ export default function Auth() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                {isLogin ? 'Signing in...' : 'Creating account...'}
+                {isForgotPassword ? 'Sending...' : isLogin ? 'Signing in...' : 'Creating account...'}
               </span>
             ) : (
-              isLogin ? 'Sign in' : 'Create account'
+              isForgotPassword ? 'Send reset link' : isLogin ? 'Sign in' : 'Create account'
             )}
           </button>
 
-          <button
-            type="button"
-            className="w-full text-sm tracking-wider uppercase text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              clearError();
-            }}
-          >
-            {isLogin ? 'Create new account' : 'Sign in instead'}
-          </button>
+          {!isForgotPassword && (
+            <>
+              <button
+                type="button"
+                className="w-full text-sm tracking-wider uppercase text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  clearMessages();
+                }}
+              >
+                {isLogin ? 'Create new account' : 'Sign in instead'}
+              </button>
+              
+              {isLogin && (
+                <button
+                  type="button"
+                  className="w-full text-sm tracking-wider uppercase text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white"
+                  onClick={() => {
+                    setIsForgotPassword(true);
+                    clearMessages();
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </>
+          )}
+          
+          {isForgotPassword && (
+            <button
+              type="button"
+              className="w-full text-sm tracking-wider uppercase text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white"
+              onClick={() => {
+                setIsForgotPassword(false);
+                clearMessages();
+              }}
+            >
+              Back to sign in
+            </button>
+          )}
         </form>
       </motion.div>
     </div>

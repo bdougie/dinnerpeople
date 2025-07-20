@@ -53,11 +53,9 @@ class AIService {
     for (const frame of frames) {
       try {
         // Get frame description using appropriate service
-        console.log(`[DEBUG] Analyzing frame at ${frame.timestamp}s`);
         const description = await this.analyzeFrame(frame.imageUrl);
         
         // Store frame with embedding using OpenAI
-        console.log(`[DEBUG] Storing frame with embedding - timestamp: ${frame.timestamp}s`);
         await this.storeFrameWithEmbedding(
           videoId,
           frame.timestamp,
@@ -65,9 +63,7 @@ class AIService {
           frame.imageUrl
         );
         
-        console.log(`[DEBUG] Successfully processed frame at ${frame.timestamp}s`);
-      } catch (error) {
-        console.error(`[DEBUG] Error processing frame at ${frame.timestamp}s:`, error);
+      } catch {
         // Continue with other frames even if one fails
       }
     }

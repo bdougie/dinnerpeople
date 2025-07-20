@@ -4,12 +4,18 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Upload from "./pages/Upload";
 import MyRecipes from "./pages/MyRecipes";
+import RecipeDetail from "./pages/RecipeDetail";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
+import PasswordTest from "./pages/PasswordTest";
+import AuthCallback from "./pages/AuthCallback";
 import { useAuthStore } from "./store/authStore";
 import AdminSandbox from "./pages/admin/sandbox";
+import TestDB from "./pages/admin/test-db";
 import { UploadProvider } from "./contexts/UploadContext";
 import { UploadStatusIndicator } from "./components/UploadStatusIndicator";
+import { AdminRoute } from "./components/AdminRoute";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -35,6 +41,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="/password-test" element={<PasswordTest />} />
           <Route
             path="/"
             element={
@@ -45,9 +54,19 @@ function App() {
           >
             <Route index element={<Home />} />
             <Route path="my-recipes" element={<MyRecipes />} />
+            <Route path="my-recipes/:id" element={<RecipeDetail />} />
             <Route path="upload" element={<Upload />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="admin/sandbox" element={<AdminSandbox />} />
+            <Route path="admin/sandbox" element={
+              <AdminRoute>
+                <AdminSandbox />
+              </AdminRoute>
+            } />
+            <Route path="admin/test-db" element={
+              <AdminRoute>
+                <TestDB />
+              </AdminRoute>
+            } />
           </Route>
         </Routes>
         <UploadStatusIndicator />

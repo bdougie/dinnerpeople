@@ -1,0 +1,267 @@
+SET session_replication_role = replica;
+
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 15.8
+-- Dumped by pg_dump version 15.8
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Data for Name: audit_log_entries; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."audit_log_entries" ("instance_id", "id", "payload", "created_at", "ip_address") VALUES
+	('00000000-0000-0000-0000-000000000000', '8fcd4614-0a48-4d60-8ee0-a1959f0418ca', '{"action":"user_signedup","actor_id":"56df4e6f-0079-4966-adc1-085cf9c0ad3d","actor_username":"ilikerobot@gmail.com","actor_via_sso":false,"log_type":"team","traits":{"provider":"email"}}', '2025-07-19 23:47:33.486902+00', ''),
+	('00000000-0000-0000-0000-000000000000', 'be924a6d-a572-47b1-935a-25564c57473f', '{"action":"login","actor_id":"56df4e6f-0079-4966-adc1-085cf9c0ad3d","actor_username":"ilikerobot@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-07-19 23:47:33.489022+00', '');
+
+
+--
+-- Data for Name: flow_state; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at", "invited_at", "confirmation_token", "confirmation_sent_at", "recovery_token", "recovery_sent_at", "email_change_token_new", "email_change", "email_change_sent_at", "last_sign_in_at", "raw_app_meta_data", "raw_user_meta_data", "is_super_admin", "created_at", "updated_at", "phone", "phone_confirmed_at", "phone_change", "phone_change_token", "phone_change_sent_at", "email_change_token_current", "email_change_confirm_status", "banned_until", "reauthentication_token", "reauthentication_sent_at", "is_sso_user", "deleted_at", "is_anonymous") VALUES
+	('00000000-0000-0000-0000-000000000000', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', 'authenticated', 'authenticated', 'ilikerobot@gmail.com', '$2a$10$cx6g7kf6LkqMQbVocZVbwO7ZDPLQHldJehRXhFRvjRusBO1Bu7dWG', '2025-07-19 23:47:33.487442+00', NULL, '', NULL, '', NULL, '', '', NULL, '2025-07-19 23:47:33.489211+00', '{"provider": "email", "providers": ["email"]}', '{"sub": "56df4e6f-0079-4966-adc1-085cf9c0ad3d", "email": "ilikerobot@gmail.com", "email_verified": true, "phone_verified": false}', NULL, '2025-07-19 23:47:33.481771+00', '2025-07-19 23:47:33.490798+00', NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false);
+
+
+--
+-- Data for Name: identities; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."identities" ("provider_id", "user_id", "identity_data", "provider", "last_sign_in_at", "created_at", "updated_at", "id") VALUES
+	('56df4e6f-0079-4966-adc1-085cf9c0ad3d', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{"sub": "56df4e6f-0079-4966-adc1-085cf9c0ad3d", "email": "ilikerobot@gmail.com", "email_verified": false, "phone_verified": false}', 'email', '2025-07-19 23:47:33.485424+00', '2025-07-19 23:47:33.485445+00', '2025-07-19 23:47:33.485445+00', 'd42396d3-1aae-4db4-8b22-7a0a92019670');
+
+
+--
+-- Data for Name: instances; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: sessions; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."sessions" ("id", "user_id", "created_at", "updated_at", "factor_id", "aal", "not_after", "refreshed_at", "user_agent", "ip", "tag") VALUES
+	('f6531b36-1ca1-4282-a361-3a1755e22e6a', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:33.489249+00', '2025-07-19 23:47:33.489249+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36', '172.23.0.1', NULL);
+
+
+--
+-- Data for Name: mfa_amr_claims; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."mfa_amr_claims" ("session_id", "created_at", "updated_at", "authentication_method", "id") VALUES
+	('f6531b36-1ca1-4282-a361-3a1755e22e6a', '2025-07-19 23:47:33.490989+00', '2025-07-19 23:47:33.490989+00', 'password', '8e77213e-9346-420f-8162-f507a743fb40');
+
+
+--
+-- Data for Name: mfa_factors; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: mfa_challenges; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: one_time_tokens; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: refresh_tokens; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+INSERT INTO "auth"."refresh_tokens" ("instance_id", "id", "token", "user_id", "revoked", "created_at", "updated_at", "parent", "session_id") VALUES
+	('00000000-0000-0000-0000-000000000000', 1, 'MP4rmMgH-C4c0g_zfFQQHw', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', false, '2025-07-19 23:47:33.489987+00', '2025-07-19 23:47:33.489987+00', NULL, 'f6531b36-1ca1-4282-a361-3a1755e22e6a');
+
+
+--
+-- Data for Name: sso_providers; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: saml_providers; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: saml_relay_states; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: sso_domains; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
+--
+
+
+
+--
+-- Data for Name: recipes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO "public"."recipes" ("id", "title", "description", "thumbnail_url", "ingredients", "instructions", "user_id", "attribution", "created_at", "updated_at", "status", "ai_generated", "recipe_summary", "video_url") VALUES
+	('c7bcf940-2b22-4755-a07e-082acf224573', 'Unknown Recipe', 'The recipe content could not be determined from the video frames.', 'http://localhost:54321/storage/v1/object/public/thumbnails/56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573.jpg', '{}', NULL, '56df4e6f-0079-4966-adc1-085cf9c0ad3d', NULL, '2025-07-19 23:47:40.961501+00', '2025-07-19 23:47:44.691+00', 'draft', true, NULL, 'http://localhost:54321/storage/v1/object/public/videos/56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573.mp4'),
+	('a4e890c5-73db-406d-b90a-b6516725d127', 'Unknown Recipe', 'The recipe content could not be determined from the video frames.', 'http://localhost:54321/storage/v1/object/public/thumbnails/56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127.jpg', '{}', NULL, '56df4e6f-0079-4966-adc1-085cf9c0ad3d', NULL, '2025-07-19 23:52:57.810357+00', '2025-07-19 23:52:58.971+00', 'draft', true, NULL, 'http://localhost:54321/storage/v1/object/public/videos/56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127.mp4');
+
+
+--
+-- Data for Name: frame_descriptions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
+-- Data for Name: processing_queue; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO "public"."processing_queue" ("id", "recipe_id", "status", "error", "created_at", "updated_at", "started_at", "completed_at") VALUES
+	('039e5122-e61b-4d88-ad7e-4128bfd8c6e3', 'c7bcf940-2b22-4755-a07e-082acf224573', 'pending', NULL, '2025-07-19 23:47:40.97651+00', '2025-07-19 23:47:40.97651+00', NULL, NULL),
+	('e055d88d-578d-4fdc-9df0-3e7fff2e1954', 'a4e890c5-73db-406d-b90a-b6516725d127', 'pending', NULL, '2025-07-19 23:52:57.822935+00', '2025-07-19 23:52:57.822935+00', NULL, NULL);
+
+
+--
+-- Data for Name: recipe_interactions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
+-- Data for Name: upload_progress; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO "public"."upload_progress" ("recipe_id", "progress", "bytes_uploaded", "total_bytes", "speed", "status", "error", "created_at", "updated_at") VALUES
+	('c7bcf940-2b22-4755-a07e-082acf224573', 100.00, 63450311, 63450311, 0, 'completed', NULL, '2025-07-19 23:47:40.980494+00', '2025-07-19 23:47:41.867414+00'),
+	('a4e890c5-73db-406d-b90a-b6516725d127', 100.00, 24326567, 24326567, 0, 'completed', NULL, '2025-07-19 23:52:57.82813+00', '2025-07-19 23:52:58.149169+00');
+
+
+--
+-- Data for Name: video_frames; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
+-- Data for Name: buckets; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public", "avif_autodetection", "file_size_limit", "allowed_mime_types", "owner_id", "type") VALUES
+	('videos', 'videos', NULL, '2025-07-19 23:40:13.709637+00', '2025-07-19 23:40:13.709637+00', true, false, NULL, NULL, NULL, 'STANDARD'),
+	('thumbnails', 'thumbnails', NULL, '2025-07-19 23:40:13.709637+00', '2025-07-19 23:40:13.709637+00', true, false, NULL, NULL, NULL, 'STANDARD'),
+	('frames', 'frames', NULL, '2025-07-19 23:40:13.729949+00', '2025-07-19 23:40:13.729949+00', true, false, NULL, NULL, NULL, 'STANDARD');
+
+
+--
+-- Data for Name: buckets_analytics; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+
+
+--
+-- Data for Name: iceberg_namespaces; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+
+
+--
+-- Data for Name: iceberg_tables; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+
+
+--
+-- Data for Name: objects; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+INSERT INTO "storage"."objects" ("id", "bucket_id", "name", "owner", "created_at", "updated_at", "last_accessed_at", "metadata", "version", "owner_id", "user_metadata", "level") VALUES
+	('36cca56c-2537-491d-a62a-6af3a082ad54', 'videos', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573.mp4', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:41.827949+00', '2025-07-19 23:47:41.827949+00', '2025-07-19 23:47:41.827949+00', '{"eTag": "\"bc773842bee3c7554fbc047094dc0d1f\"", "size": 63450311, "mimetype": "video/mp4", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:41.432Z", "contentLength": 63450311, "httpStatusCode": 200}', '6ea66ce1-5a7f-49bf-afde-412171b37ee9', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 2),
+	('be9d53fc-10ea-486f-b11a-81b65e08509d', 'thumbnails', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:41.893042+00', '2025-07-19 23:47:41.893042+00', '2025-07-19 23:47:41.893042+00', '{"eTag": "\"b7b2715198192e06fd9a6129201865a3\"", "size": 47796, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:41.890Z", "contentLength": 47796, "httpStatusCode": 200}', '8660cd66-c3a2-4584-87ff-838622ae4de2', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 2),
+	('4dddc402-91c8-4fba-a0fe-cb31a697b142', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/0.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.041274+00', '2025-07-19 23:47:42.041274+00', '2025-07-19 23:47:42.041274+00', '{"eTag": "\"1de8096d599657d477bba5e6c0a2d02e\"", "size": 47385, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.038Z", "contentLength": 47385, "httpStatusCode": 200}', '7b726b28-8c93-4a69-9acd-baabb37a7dbb', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('aaa461a8-d695-43d4-a5b0-dfef0ba34daa', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/5.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.059207+00', '2025-07-19 23:47:42.059207+00', '2025-07-19 23:47:42.059207+00', '{"eTag": "\"fcdda850283a88920cfd681c22e601cb\"", "size": 44893, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.053Z", "contentLength": 44893, "httpStatusCode": 200}', 'cb300e2e-76ce-404b-994b-d3c9d2f7e4b0', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('a905e495-4b8c-413d-bc08-e9e2ec7a5c58', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/10.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.071519+00', '2025-07-19 23:47:42.071519+00', '2025-07-19 23:47:42.071519+00', '{"eTag": "\"899006af5604d266f6563d67755f9ded\"", "size": 50341, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.068Z", "contentLength": 50341, "httpStatusCode": 200}', '0b4e7d51-5578-4a28-9c94-2c57cb4a8bf2', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('5935bf9c-7349-4387-b6f1-74f783d8f33d', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/15.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.087066+00', '2025-07-19 23:47:42.087066+00', '2025-07-19 23:47:42.087066+00', '{"eTag": "\"9c20accaf154b4feac1115fe6bdf33da\"", "size": 53465, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.084Z", "contentLength": 53465, "httpStatusCode": 200}', 'b81240d3-7b95-4abb-a931-6bbf63a8ef71', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('6fa01a61-e999-420b-aeef-5a39506a3524', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/20.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.102341+00', '2025-07-19 23:47:42.102341+00', '2025-07-19 23:47:42.102341+00', '{"eTag": "\"47fb9d21fe5c9b1066f2dbaf14a0cb8b\"", "size": 54564, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.100Z", "contentLength": 54564, "httpStatusCode": 200}', 'b1f86219-3f5d-41f6-914c-a21355ce8253', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('6a3c7595-7850-412d-b6b4-676c7d4377a9', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/25.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.114852+00', '2025-07-19 23:47:42.114852+00', '2025-07-19 23:47:42.114852+00', '{"eTag": "\"8770232131e6cef17832386d3ee53441\"", "size": 45985, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.112Z", "contentLength": 45985, "httpStatusCode": 200}', '842a01dc-ab44-45b1-8345-2594f2744009', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('53747791-f01e-43ca-8d88-325a7c56413b', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573/30.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.129704+00', '2025-07-19 23:47:42.129704+00', '2025-07-19 23:47:42.129704+00', '{"eTag": "\"b2ee527152e0c22b5f72ad6925e32b91\"", "size": 55195, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:47:42.127Z", "contentLength": 55195, "httpStatusCode": 200}', '98fc66cf-e001-46a5-a892-482aefea9a82', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('e35e30c6-1614-494a-900b-df6df51eb440', 'videos', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127.mp4', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.133794+00', '2025-07-19 23:52:58.133794+00', '2025-07-19 23:52:58.133794+00', '{"eTag": "\"dc5d7489484846521e3f1fbdec604ced\"", "size": 24326567, "mimetype": "video/mp4", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:57.994Z", "contentLength": 24326567, "httpStatusCode": 200}', '59043625-ccdf-40c1-840a-de23fed8ac73', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 2),
+	('dd5f88ff-5c44-4b6a-87ae-03e8c6ff8096', 'thumbnails', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.172435+00', '2025-07-19 23:52:58.172435+00', '2025-07-19 23:52:58.172435+00', '{"eTag": "\"368437267bd2de94d430f8968343f000\"", "size": 36904, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:58.170Z", "contentLength": 36904, "httpStatusCode": 200}', 'cc02de15-afe6-4db9-a1cb-3cc034fc1f20', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 2),
+	('611fe4d5-d9f5-447b-82a9-c55ca74c4ea5', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127/0.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.264179+00', '2025-07-19 23:52:58.264179+00', '2025-07-19 23:52:58.264179+00', '{"eTag": "\"2cfbf24b8b8bb60f229b2de303a004fd\"", "size": 42470, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:58.262Z", "contentLength": 42470, "httpStatusCode": 200}', '80e5a5b1-0e6b-4745-ae43-81835248f5a2', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('b201066c-eb11-47b9-ba34-b9d435ec9a52', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127/5.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.279894+00', '2025-07-19 23:52:58.279894+00', '2025-07-19 23:52:58.279894+00', '{"eTag": "\"1477f5f0ede3b36baa2c56f4b5e39fae\"", "size": 40198, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:58.278Z", "contentLength": 40198, "httpStatusCode": 200}', '0b2b9567-b0c4-47c7-af23-ffcaf4df46b3', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('1854b098-48c7-407f-b433-e46f75dbff5f', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127/10.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.294047+00', '2025-07-19 23:52:58.294047+00', '2025-07-19 23:52:58.294047+00', '{"eTag": "\"ab5bc7e8f813f983a42291927a1a7ced\"", "size": 42821, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:58.292Z", "contentLength": 42821, "httpStatusCode": 200}', 'fd6bc7f6-1345-418b-be2c-4256225c9fe1', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3),
+	('b2832133-0004-4a4a-857c-8846ccbadd78', 'frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127/15.jpg', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:52:58.317722+00', '2025-07-19 23:52:58.317722+00', '2025-07-19 23:52:58.317722+00', '{"eTag": "\"4669d93ea7c579f688b39c8de23d2d50\"", "size": 22695, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-07-19T23:52:58.316Z", "contentLength": 22695, "httpStatusCode": 200}', 'edec9aee-d2f6-4259-99d3-d669874df3bd', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '{}', 3);
+
+
+--
+-- Data for Name: prefixes; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+INSERT INTO "storage"."prefixes" ("bucket_id", "name", "created_at", "updated_at") VALUES
+	('videos', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:41.827949+00', '2025-07-19 23:47:41.827949+00'),
+	('thumbnails', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:41.893042+00', '2025-07-19 23:47:41.893042+00'),
+	('frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d', '2025-07-19 23:47:42.041274+00', '2025-07-19 23:47:42.041274+00'),
+	('frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/c7bcf940-2b22-4755-a07e-082acf224573', '2025-07-19 23:47:42.041274+00', '2025-07-19 23:47:42.041274+00'),
+	('frames', '56df4e6f-0079-4966-adc1-085cf9c0ad3d/a4e890c5-73db-406d-b90a-b6516725d127', '2025-07-19 23:52:58.264179+00', '2025-07-19 23:52:58.264179+00');
+
+
+--
+-- Data for Name: s3_multipart_uploads; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+
+
+--
+-- Data for Name: s3_multipart_uploads_parts; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+
+
+--
+-- Data for Name: hooks; Type: TABLE DATA; Schema: supabase_functions; Owner: supabase_functions_admin
+--
+
+
+
+--
+-- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
+--
+
+SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 1, true);
+
+
+--
+-- Name: hooks_id_seq; Type: SEQUENCE SET; Schema: supabase_functions; Owner: supabase_functions_admin
+--
+
+SELECT pg_catalog.setval('"supabase_functions"."hooks_id_seq"', 1, false);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+RESET ALL;

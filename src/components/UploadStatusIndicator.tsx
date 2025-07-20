@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
-import { useUploadsInProgress, useUploadContext } from '../contexts/UploadContext';
+import { useUploadsInProgress, useUploadContext } from '../contexts/useUploadContext';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../hooks/useUploadProgress';
 import { useNavigate } from 'react-router-dom';
 
@@ -55,8 +55,8 @@ export function UploadStatusIndicator() {
                     {getStatusText(upload.status)}
                   </p>
                   
-                  {/* Progress bar */}
-                  {(upload.status === 'uploading' || upload.status === 'compressing') && (
+                  {/* Progress bar - only show for actual upload/compression, not processing */}
+                  {(upload.status === 'uploading' || upload.status === 'compressing') && upload.progress.totalBytes > 0 && (
                     <div className="mt-2">
                       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
                         <span>{upload.progress.percentage.toFixed(0)}%</span>

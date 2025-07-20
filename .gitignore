@@ -27,3 +27,4 @@ dist-ssr
 
 .mcp.json
 upload-test/
+coverage/

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { uploadVideoWithRealtimeProgress } from './uploadWithRealtimeProgress';
+import { generateVideoTitle } from './openai';
 
 export interface UploadResult {
   recipeId: string;
@@ -8,24 +9,19 @@ export interface UploadResult {
 }
 
 export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<UploadResult> {
-  console.log('[DEBUG] uploadVideo started with file:', file.name, file.size);
   
   const userResponse = await supabase.auth.getUser();
-  console.log('[DEBUG] Auth getUser response:', userResponse);
   
   const userId = userResponse.data.user?.id;
   if (!userId) {
-    console.error('[DEBUG] User not authenticated');
     throw new Error('User not authenticated');
   }
 
   // Generate unique ID for the recipe
   const recipeId = uuidv4();
-  console.log('[DEBUG] Generated recipeId:', recipeId);
 
   // Create recipe entry with a temporary title and thumbnail if provided
-  console.log('[DEBUG] Creating recipe entry in database');
-  const { data: recipeData, error: recipeError } = await supabase
+  const { error: recipeError } = await supabase
     .from('recipes')
     .insert({
       id: recipeId,
@@ -37,16 +33,35 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
     })
     .select();
 
-  console.log('[DEBUG] Recipe insert response:', { data: recipeData, error: recipeError });
   
   if (recipeError) {
-    console.error('[DEBUG] Recipe creation error:', recipeError);
     throw recipeError;
   }
 
+  // Generate a better title using the thumbnail if available
+  if (thumbnailUrl) {
+    try {
+      const generatedTitle = await generateVideoTitle(thumbnailUrl);
+      
+      if (generatedTitle && !generatedTitle.includes('Untitled Recipe')) {
+        
+        // Update the recipe with the generated title
+        const { error: updateError } = await supabase
+          .from('recipes')
+          .update({ title: generatedTitle })
+          .eq('id', recipeId);
+          
+        if (updateError) {
+          // Continue even if title update fails
+        }
+      }
+    } catch {
+      // Continue with the default title
+    }
+  }
+
   // Add to processing queue
-  console.log('[DEBUG] Adding to processing queue');
-  const { data: queueData, error: queueError } = await supabase
+  const { error: queueError } = await supabase
     .from('processing_queue')
     .insert({
       recipe_id: recipeId,
@@ -54,22 +69,18 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
     })
     .select();
 
-  console.log('[DEBUG] Processing queue insert response:', { data: queueData, error: queueError });
   
   if (queueError) {
-    console.error('[DEBUG] Processing queue error:', queueError);
     throw queueError;
   }
 
   // Now upload the actual video file to storage with progress tracking
-  console.log('[DEBUG] Uploading video file to storage with progress tracking');
   const filePath = `${userId}/${recipeId}.mp4`;
   
   try {
     // Use the enhanced upload function with realtime progress
     await uploadVideoWithRealtimeProgress(file, filePath, 'videos', recipeId);
     
-    console.log('[DEBUG] Storage upload completed');
 
     // Get the proper public URL with the full path
     const { data: urlData } = supabase.storage
@@ -77,7 +88,6 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .getPublicUrl(filePath);
 
     // Make sure the URL is complete with the file path
-    console.log('[DEBUG] Generated video URL:', urlData.publicUrl);
 
     // Update the recipe with the correct URL
     const { error: updateError } = await supabase
@@ -88,13 +98,12 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .eq('id', recipeId);
 
     if (updateError) {
-      console.error('[DEBUG] Error updating recipe with video URL:', updateError);
+      // Failed to update recipe with video URL
     } else {
-      console.log('[DEBUG] Recipe updated with video URL');
+      // Recipe updated successfully with video URL
     }
 
     // Upload successful - update processing_queue status to "processing"
-    console.log('[DEBUG] Updating processing queue status to "processing"');
     const { error: queueUpdateError } = await supabase
       .from('processing_queue')
       .update({ 
@@ -104,15 +113,14 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
       .eq('recipe_id', recipeId);
     
     if (queueUpdateError) {
-      console.error('[DEBUG] Error updating processing status:', queueUpdateError);
+      // Failed to update processing queue status
     } else {
-      console.log('[DEBUG] Processing status updated to "processing"');
+      // Processing queue updated successfully
     }
 
     // If we have a data URL for the thumbnail, save it to storage
     if (thumbnailUrl && thumbnailUrl.startsWith('data:')) {
       try {
-        console.log('[DEBUG] Saving thumbnail to storage');
         // Convert data URL to blob
         const response = await fetch(thumbnailUrl);
         const blob = await response.blob();
@@ -124,7 +132,7 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
           .upload(thumbnailPath, blob);
           
         if (thumbError) {
-          console.error('[DEBUG] Error uploading thumbnail:', thumbError);
+          // Failed to upload thumbnail
         } else {
           // Get the public URL
           const { data: urlData } = supabase.storage
@@ -140,13 +148,12 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
             .eq('id', recipeId);
             
           if (updateThumbError) {
-            console.error('[DEBUG] Error updating recipe with thumbnail URL:', updateThumbError);
+            // Failed to update recipe with thumbnail URL
           } else {
-            console.log('[DEBUG] Recipe updated with thumbnail URL:', urlData.publicUrl);
+            // Recipe updated successfully with thumbnail URL
           }
         }
-      } catch (thumbErr) {
-        console.error('[DEBUG] Error processing thumbnail:', thumbErr);
+      } catch {
         // Don't fail the whole upload if just the thumbnail processing fails
       }
     }
@@ -157,7 +164,6 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
     };
   } catch (error) {
     // Catch and rethrow errors, including network issues that might occur during large uploads
-    console.error('[DEBUG] Upload exception:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
@@ -183,6 +189,5 @@ export async function uploadVideo(file: File, thumbnailUrl?: string): Promise<Up
     throw error;
   }
 
-  console.log('[DEBUG] Video upload completed successfully');
   return { recipeId, processingStatus: 'processing' };
 }

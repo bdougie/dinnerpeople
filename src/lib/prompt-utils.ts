@@ -40,7 +40,17 @@ export const PROMPTS = {
     For example: {"title": "Recipe Title", "description": "Recipe description text"}
     
     If you cannot determine what the recipe is about, respond with:
-    {"title": "Unknown Recipe", "description": "The recipe content could not be determined from the video frames."}`
+    {"title": "Unknown Recipe", "description": "The recipe content could not be determined from the video frames."}`,
+  
+  VIDEO_TITLE_GENERATION:
+    `Look at this cooking video thumbnail and generate a short, descriptive recipe title.
+    The title should be:
+    - Under 50 characters
+    - Descriptive of the main dish or food item shown
+    - Appealing and easy to understand
+    - If you can't identify the dish, describe what you see (e.g., "Colorful Vegetable Dish")
+    
+    Respond with ONLY the title, no extra text or punctuation.`
 }
 
 /**
@@ -74,16 +84,11 @@ export function formatCookingSteps(descriptions: string[]): string {
  */
 export function parseRecipeSummaryResponse(response: string): RecipeSummary {
   // Log the raw response to see what we're getting
-  console.log('[DEBUG] Raw response before parsing:', response);
-  console.log('[DEBUG] Response type:', typeof response);
-  console.log('[DEBUG] Response length:', response?.length);
   
   try {
     // Log the first 100 characters to get a preview
-    console.log('[DEBUG] Response preview:', response?.substring(0, 100));
     
     const parsed = JSON.parse(response);
-    console.log('[DEBUG] Successfully parsed JSON:', parsed);
     
     return {
       title: parsed.title || 'Untitled Recipe',
@@ -92,9 +97,6 @@ export function parseRecipeSummaryResponse(response: string): RecipeSummary {
     };
   } catch (e) {
     console.error('Failed to parse AI response as JSON:', e);
-    // Log more details about the error
-    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    console.error('[DEBUG] Error details:', errorMessage);
     
     return {
       title: 'Unknown Recipe',
@@ -125,7 +127,6 @@ export async function updateRecipeWithGeneratedSummary(
       
     if (error) throw error;
     
-    console.log('[DEBUG] Updated recipe with AI-generated summary:', summary);
   } catch (error) {
     console.error('Error updating recipe with summary:', error);
     throw error;
@@ -272,15 +273,24 @@ export async function processSocialHandles(
     if (socialHandles && socialHandles.length > 0) {
       for (const handle of socialHandles) {
         const [platform, username] = handle.split(':');
-        const { error } = await supabase
-          .from('recipe_social_media')
-          .insert({
-            recipe_id: recipeId,
-            platform,
-            username,
-          });
+        try {
+          const { error } = await supabase
+            .from('recipe_social_media')
+            .insert({
+              recipe_id: recipeId,
+              platform,
+              username,
+            });
 
-        if (error) console.error('Error storing social handle:', error);
+          if (error) {
+            console.error('Error storing social handle:', error);
+            // Continue processing even if storage fails
+            // This might happen if the table doesn't exist yet
+          }
+        } catch (err) {
+          console.error('Failed to store social handle:', err);
+          // Continue processing other handles
+        }
       }
 
       // Format the first handle as a proper URL and update the recipe attribution
@@ -306,10 +316,8 @@ export async function processSocialHandles(
 
       if (updateError) console.error('Error updating recipe attribution:', updateError);
 
-      console.log('[DEBUG] Stored recipe social handles:', socialHandles);
-      console.log('[DEBUG] Updated recipe attribution with formatted URL:', formattedUrl);
     } else {
-      console.log('[DEBUG] No social handles found, skipping database update');
+      // No social handles found, nothing to update
     }
 
     return socialHandles;
