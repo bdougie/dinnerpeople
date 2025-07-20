@@ -8,6 +8,7 @@ import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import { useAuthStore } from "./store/authStore";
 import AdminSandbox from "./pages/admin/sandbox";
+import TestDB from "./pages/admin/test-db";
 import { UploadProvider } from "./contexts/UploadContext";
 import { UploadStatusIndicator } from "./components/UploadStatusIndicator";
 import { AdminRoute } from "./components/AdminRoute";
@@ -51,6 +52,11 @@ function App() {
             <Route path="admin/sandbox" element={
               <AdminRoute>
                 <AdminSandbox />
+              </AdminRoute>
+            } />
+            <Route path="admin/test-db" element={
+              <AdminRoute>
+                <TestDB />
               </AdminRoute>
             } />
           </Route>
