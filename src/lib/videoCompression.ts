@@ -135,7 +135,7 @@ function formatFileSize(bytes: number): string {
   return `${mb.toFixed(1)}MB`;
 }
 
-export function isCompressionNeeded(_file: File): boolean {
+export function isCompressionNeeded(): boolean {
   // TODO: Re-enable compression after fixing FFmpeg.wasm issues
   // See: https://github.com/bdougie/dinnerpeople/issues/25
   // Temporarily disabled - always return false

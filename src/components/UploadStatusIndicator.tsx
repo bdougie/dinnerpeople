@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
-import { useUploadsInProgress, useUploadContext } from '../contexts/UploadContext';
+import { useUploadsInProgress, useUploadContext } from '../contexts/useUploadContext';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../hooks/useUploadProgress';
 import { useNavigate } from 'react-router-dom';
 

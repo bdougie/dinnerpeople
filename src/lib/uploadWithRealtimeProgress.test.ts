@@ -178,7 +178,7 @@ describe.skip('uploadWithRealtimeProgress', () => {
   });
 
   it('should calculate progress correctly with decimal values', async () => {
-    let capturedProgress: number[] = [];
+    const capturedProgress: number[] = [];
     
     await uploadVideoWithRealtimeProgress(
       mockFile,

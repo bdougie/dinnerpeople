@@ -19,7 +19,7 @@ import { useUploadProgress, formatBytes, formatSpeed, formatTimeRemaining } from
 import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploadWithRealtimeProgress";
 import { useVideoCompression, formatCompressionStats } from "../hooks/useVideoCompression";
 import { isCompressionNeeded } from "../lib/videoCompression";
-import { useUploadContext, useActiveUpload } from "../contexts/UploadContext";
+import { useUploadContext, useActiveUpload } from "../contexts/useUploadContext";
 import { UploadStatusTracker } from "../components/UploadStatusTracker";
 
 
@@ -248,7 +248,7 @@ export default function Upload() {
       );
       processVideoFrames(preview.file, recipeId);
     }
-  }, [processingStatus, preview, recipeId, processingFrames]);
+  }, [processingStatus, preview, recipeId, processingFrames, processVideoFrames]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -513,7 +513,7 @@ export default function Upload() {
     }
   };
 
-  const processVideoFrames = async (videoFile: File, recipeId: string) => {
+  const processVideoFrames = useCallback(async (videoFile: File, recipeId: string) => {
     try {
       setProcessingFrames(true);
       console.log("[DEBUG] Starting frame extraction");
@@ -754,7 +754,7 @@ export default function Upload() {
     } finally {
       setProcessingFrames(false);
     }
-  };
+  }, [updateContextProgress, activeUpload]);
 
   // Add a useEffect that will check processing status periodically if realtime updates fail
   useEffect(() => {
