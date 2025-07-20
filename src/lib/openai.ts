@@ -58,12 +58,14 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    // Use OpenAI embeddings API
+    // Use OpenAI embeddings API with explicit dimensions
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: text,
+      dimensions: 1536 // Explicitly set to match our database column
     });
     
+    console.log(`Generated embedding with ${response.data[0].embedding.length} dimensions`);
     return response.data[0].embedding;
   } catch (error) {
     console.error('Error generating OpenAI embedding:', error);
