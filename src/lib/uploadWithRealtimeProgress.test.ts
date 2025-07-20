@@ -47,11 +47,9 @@ describe.skip('uploadWithRealtimeProgress', () => {
   // Skipped: These tests are based on incorrect assumptions about the function's return value
   // The actual function returns Promise<void>, not an object with success/error properties
   let mockFile: File;
-  let uploadProgress: number = 0;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    uploadProgress = 0;
     
     // Create a mock file
     const blob = new Blob(['test content'], { type: 'video/mp4' });
@@ -59,22 +57,7 @@ describe.skip('uploadWithRealtimeProgress', () => {
     Object.defineProperty(mockFile, 'size', { value: 1082885.3077333334 }); // Non-integer size
 
     // Mock successful upload with progress tracking
-    mockUpload.mockImplementation((path, file, options) => {
-      // Simulate progress updates
-      if (options?.onUploadProgress) {
-        setTimeout(() => {
-          uploadProgress = 0.33;
-          options.onUploadProgress({ progress: 0.33 });
-        }, 10);
-        setTimeout(() => {
-          uploadProgress = 0.67;
-          options.onUploadProgress({ progress: 0.67 });
-        }, 20);
-        setTimeout(() => {
-          uploadProgress = 1;
-          options.onUploadProgress({ progress: 1 });
-        }, 30);
-      }
+    mockUpload.mockImplementation((path) => {
       return Promise.resolve({ data: { path }, error: null });
     });
 
@@ -85,16 +68,12 @@ describe.skip('uploadWithRealtimeProgress', () => {
   });
 
   it('should round bytes_uploaded to whole numbers for bigint columns', async () => {
-    const result = await uploadVideoWithRealtimeProgress(
+    await uploadVideoWithRealtimeProgress(
       mockFile,
       'test-video.mp4',
       'videos',
-      () => {},
-      (progress) => {}
+      'recipe-123'
     );
-
-    expect(result.success).toBe(true);
-    expect(result.path).toBe('test-video.mp4');
 
     // Check that insert was called with rounded values
     const insertCalls = mockInsert.mock.calls;
@@ -111,17 +90,13 @@ describe.skip('uploadWithRealtimeProgress', () => {
   });
 
   it('should round speed values to whole numbers', async () => {
-    const startTime = Date.now();
     
-    const result = await uploadVideoWithRealtimeProgress(
+    await uploadVideoWithRealtimeProgress(
       mockFile,
       'test-video.mp4',
       'videos',
-      () => {},
-      (progress) => {}
+      'recipe-123'
     );
-
-    expect(result.success).toBe(true);
 
     // Check that update was called with rounded speed values
     const updateCalls = mockUpdate.mock.calls;
@@ -140,23 +115,22 @@ describe.skip('uploadWithRealtimeProgress', () => {
     const decimalSizeFile = new File(['test'], 'test.mp4', { type: 'video/mp4' });
     Object.defineProperty(decimalSizeFile, 'size', { value: 9876543.21 });
 
-    const result = await uploadVideoWithRealtimeProgress(
+    await uploadVideoWithRealtimeProgress(
       decimalSizeFile,
       'test.mp4',
       'videos',
-      () => {},
-      (progress) => {}
+      'recipe-123'
     );
-
-    expect(result.success).toBe(true);
 
     // Verify total_bytes is rounded
     const insertCall = mockInsert.mock.calls.find(call => 
       call[0].total_bytes !== undefined
     );
     expect(insertCall).toBeDefined();
-    expect(Number.isInteger(insertCall[0].total_bytes)).toBe(true);
-    expect(insertCall[0].total_bytes).toBe(9876543); // Rounded down
+    if (insertCall) {
+      expect(Number.isInteger(insertCall[0].total_bytes)).toBe(true);
+      expect(insertCall[0].total_bytes).toBe(9876543); // Rounded down
+    }
   });
 
   it('should clean up progress records after successful upload', async () => {
@@ -166,9 +140,7 @@ describe.skip('uploadWithRealtimeProgress', () => {
       mockFile,
       'test-video.mp4',
       'videos',
-      () => {},
-      (progress) => {},
-      { uploadId }
+      uploadId
     );
 
     // Verify cleanup was called
@@ -179,16 +151,14 @@ describe.skip('uploadWithRealtimeProgress', () => {
   it('should handle upload errors and clean up', async () => {
     mockUpload.mockRejectedValueOnce(new Error('Upload failed'));
 
-    const result = await uploadVideoWithRealtimeProgress(
-      mockFile,
-      'test-video.mp4',
-      'videos',
-      () => {},
-      (progress) => {}
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Upload failed');
+    await expect(
+      uploadVideoWithRealtimeProgress(
+        mockFile,
+        'test-video.mp4',
+        'videos',
+        'recipe-123'
+      )
+    ).rejects.toThrow('Upload failed');
 
     // Verify cleanup was attempted
     expect(mockDelete).toHaveBeenCalled();
@@ -198,17 +168,13 @@ describe.skip('uploadWithRealtimeProgress', () => {
     // Make insert fail for progress tracking
     mockInsert.mockRejectedValueOnce(new Error('Database error'));
 
-    const result = await uploadVideoWithRealtimeProgress(
+    // Upload should still succeed even if progress tracking fails
+    await uploadVideoWithRealtimeProgress(
       mockFile,
       'test-video.mp4',
       'videos',
-      () => {},
-      (progress) => {}
+      'recipe-123'
     );
-
-    // Upload should still succeed
-    expect(result.success).toBe(true);
-    expect(result.path).toBe('test-video.mp4');
   });
 
   it('should calculate progress correctly with decimal values', async () => {
@@ -218,10 +184,7 @@ describe.skip('uploadWithRealtimeProgress', () => {
       mockFile,
       'test-video.mp4',
       'videos',
-      () => {},
-      (progress) => {
-        capturedProgress.push(progress.progress);
-      }
+      'recipe-123'
     );
 
     // Progress values should be between 0 and 100

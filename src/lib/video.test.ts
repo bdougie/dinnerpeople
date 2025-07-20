@@ -30,7 +30,7 @@ vi.mock('./supabase', () => ({
   }
 }));
 
-import { extractFrames, uploadFrames } from './video';
+import { uploadFrames } from './video';
 
 describe('Video Frame Processing', () => {
   beforeEach(() => {
@@ -89,8 +89,8 @@ describe('Video Frame Processing', () => {
 
       // Should have uploaded 2 frames successfully (first and third)
       expect(result).toHaveLength(2);
-      expect(result[0].timestamp).toBe(0);
-      expect(result[1].timestamp).toBe(10);
+      expect(result[0]?.timestamp).toBe(0);
+      expect(result[1]?.timestamp).toBe(10);
       
       // Verify all uploads were attempted
       expect(mockStorageUpload).toHaveBeenCalledTimes(3);

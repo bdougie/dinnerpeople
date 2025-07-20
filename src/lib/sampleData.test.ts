@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Use vi.hoisted to ensure mocks are defined before module initialization
-const { mockFrom, mockSelect, mockEq, mockInsert, mockUpsert, mockGenerateEmbedding } = vi.hoisted(() => {
+const { mockFrom, mockSelect, mockInsert, mockUpsert, mockGenerateEmbedding } = vi.hoisted(() => {
   return {
     mockFrom: vi.fn(),
     mockSelect: vi.fn(),
-    mockEq: vi.fn(),
     mockInsert: vi.fn(),
     mockUpsert: vi.fn(),
     mockGenerateEmbedding: vi.fn()

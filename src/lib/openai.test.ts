@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Use vi.hoisted to ensure mocks are defined before module initialization
 const { mockEmbeddingsCreate, mockChatCreate } = vi.hoisted(() => {
@@ -208,10 +208,10 @@ describe('OpenAI Service Tests', () => {
 
       // Should have all 3 results (including failed one)
       expect(results).toHaveLength(3);
-      expect(results[0].timestamp).toBe(10);
-      expect(results[1].timestamp).toBe(20);
-      expect(results[1].description).toBe('Frame processing failed');
-      expect(results[2].timestamp).toBe(30);
+      expect(results[0]?.timestamp).toBe(10);
+      expect(results[1]?.timestamp).toBe(20);
+      expect(results[1]?.description).toBe('Frame processing failed');
+      expect(results[2]?.timestamp).toBe(30);
     });
 
     it('should handle empty frames array', async () => {
@@ -233,7 +233,7 @@ describe('OpenAI Service Tests', () => {
 
       // Should still process frames but with default description
       expect(results).toHaveLength(1);
-      expect(results[0].description).toContain('Frame analysis unavailable');
+      expect(results[0]?.description).toContain('Frame analysis unavailable');
       expect(mockChatCreate).not.toHaveBeenCalled();
     });
   });
