@@ -6,6 +6,8 @@ import { initializeSearchFunctions } from "../../lib/search";
 import { ollama } from "../../lib/ollama";
 import { testLocalEmbeddings } from "../../lib/testLocalEmbeddings";
 import * as openai from "../../lib/openai";
+import { loadSampleData, hasSampleData, removeSampleData } from "../../lib/sampleData";
+import { useAuthStore } from "../../store/authStore";
 
 interface VideoInfo {
   id: string;
@@ -35,11 +37,18 @@ interface OllamaModels {
 }
 
 const AdminSandbox: React.FC = () => {
+  const { user } = useAuthStore();
+  
   // State for videos and frames
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [selectedVideoId, setSelectedVideoId] = useState<string>("");
   const [frames, setFrames] = useState<FrameInfo[]>([]);
   const [selectedFrameId, setSelectedFrameId] = useState<string>("");
+  
+  // Sample data states
+  const [hasSamples, setHasSamples] = useState(false);
+  const [isLoadingSamples, setIsLoadingSamples] = useState(false);
+  const [sampleDataMessage, setSampleDataMessage] = useState("");
 
   // Prompt states
   const [framePrompt, setFramePrompt] = useState(PROMPTS.FRAME_ANALYSIS);
@@ -95,6 +104,7 @@ const AdminSandbox: React.FC = () => {
   useEffect(() => {
     fetchRecentVideos();
     fetchAvailableModels();
+    checkSampleData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load frames when a video is selected
@@ -485,6 +495,64 @@ const AdminSandbox: React.FC = () => {
       }
     } finally {
       setIsFixingUrls(false);
+    }
+  };
+  
+  const checkSampleData = async () => {
+    if (!user) return;
+    
+    try {
+      const hasSampleDataLoaded = await hasSampleData(user.id);
+      setHasSamples(hasSampleDataLoaded);
+    } catch (error) {
+      console.error('Error checking sample data:', error);
+    }
+  };
+  
+  const handleLoadSampleData = async () => {
+    if (!user) {
+      setSampleDataMessage('You must be logged in to load sample data');
+      return;
+    }
+    
+    setIsLoadingSamples(true);
+    setSampleDataMessage('');
+    
+    try {
+      const result = await loadSampleData(user.id);
+      setSampleDataMessage(result.message);
+      
+      if (result.success) {
+        setHasSamples(true);
+        // Refresh videos to show sample data
+        await fetchRecentVideos();
+      }
+    } catch (error) {
+      setSampleDataMessage('Error loading sample data: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoadingSamples(false);
+    }
+  };
+  
+  const handleRemoveSampleData = async () => {
+    if (!user) return;
+    
+    setIsLoadingSamples(true);
+    setSampleDataMessage('');
+    
+    try {
+      const result = await removeSampleData(user.id);
+      setSampleDataMessage(result.message);
+      
+      if (result.success) {
+        setHasSamples(false);
+        // Refresh videos
+        await fetchRecentVideos();
+      }
+    } catch (error) {
+      setSampleDataMessage('Error removing sample data: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoadingSamples(false);
     }
   };
 
@@ -891,7 +959,7 @@ const AdminSandbox: React.FC = () => {
       {/* Admin Tools Panel */}
       <div className="mb-6 p-4 border rounded bg-gray-50">
         <h2 className="text-xl font-semibold mb-2">Admin Tools</h2>
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap">
           <button
             onClick={fetchRecentVideos}
             className="px-3 py-1 bg-blue-500 text-white rounded"
@@ -911,10 +979,41 @@ const AdminSandbox: React.FC = () => {
           >
             {isFixingUrls ? "Working..." : "Fix Streaming Response Issues"}
           </button>
+          {!hasSamples ? (
+            <button
+              onClick={handleLoadSampleData}
+              disabled={isLoadingSamples}
+              className="px-3 py-1 bg-purple-500 text-white rounded disabled:bg-gray-400"
+            >
+              {isLoadingSamples ? "Loading..." : "Load Sample Data"}
+            </button>
+          ) : (
+            <button
+              onClick={handleRemoveSampleData}
+              disabled={isLoadingSamples}
+              className="px-3 py-1 bg-red-500 text-white rounded disabled:bg-gray-400"
+            >
+              {isLoadingSamples ? "Removing..." : "Remove Sample Data"}
+            </button>
+          )}
         </div>
+        {sampleDataMessage && (
+          <div className={`mt-4 p-3 rounded text-sm ${
+            sampleDataMessage.includes('Error') || sampleDataMessage.includes('failed') 
+              ? 'bg-red-100 text-red-700' 
+              : 'bg-green-100 text-green-700'
+          }`}>
+            {sampleDataMessage}
+          </div>
+        )}
         {fixResults && (
           <div className="mt-4 p-3 bg-gray-100 rounded overflow-auto max-h-48">
             <pre className="text-xs">{fixResults}</pre>
+          </div>
+        )}
+        {videos.length === 0 && !isLoadingVideos && (
+          <div className="mt-4 p-3 bg-yellow-100 text-yellow-700 rounded">
+            <p>No videos found. Would you like to load sample data for testing?</p>
           </div>
         )}
       </div>

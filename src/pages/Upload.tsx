@@ -20,6 +20,7 @@ import { subscribeToUploadProgress, type UploadProgressData } from "../lib/uploa
 import { useVideoCompression, formatCompressionStats } from "../hooks/useVideoCompression";
 import { isCompressionNeeded } from "../lib/videoCompression";
 import { useUploadContext, useActiveUpload } from "../contexts/UploadContext";
+import { UploadStatusTracker } from "../components/UploadStatusTracker";
 
 
 interface UploadPreview {
@@ -74,6 +75,17 @@ export default function Upload() {
 
   const [processingFrames, setProcessingFrames] = useState(false);
   const [frameProgress, setFrameProgress] = useState({ current: 0, total: 0 });
+  
+  // Validation status tracking
+  const [showValidationStatus, setShowValidationStatus] = useState(false);
+  const [validationStatus, setValidationStatus] = useState({
+    apiKey: null as boolean | null,
+    fileSize: null as boolean | null,
+    fileType: null as boolean | null,
+    thumbnail: null as boolean | null,
+    frameExtraction: null as boolean | null,
+    embeddings: null as boolean | null,
+  });
   
   // Restore active upload if returning to page
   useEffect(() => {
@@ -301,13 +313,39 @@ export default function Upload() {
       setError("No file provided");
       return;
     }
+    
+    // Show validation status
+    setShowValidationStatus(true);
+    
+    // Reset validation status
+    setValidationStatus({
+      apiKey: null,
+      fileSize: null,
+      fileType: null,
+      thumbnail: null,
+      frameExtraction: null,
+      embeddings: null,
+    });
+    
+    // Check API key
+    const hasApiKey = !!import.meta.env['VITE_OPENAI_API_KEY'];
+    setValidationStatus(prev => ({ ...prev, apiKey: hasApiKey }));
+    console.log('[DEBUG] API key validation:', hasApiKey);
 
-    if (!file.type.startsWith("video/")) {
+    // Validate file type
+    const isValidType = file.type.startsWith("video/");
+    setValidationStatus(prev => ({ ...prev, fileType: isValidType }));
+    
+    if (!isValidType) {
       setError("Please upload a video file");
       return;
     }
 
-    if (file.size > 200 * 1024 * 1024) {
+    // Validate file size
+    const isValidSize = file.size <= 200 * 1024 * 1024;
+    setValidationStatus(prev => ({ ...prev, fileSize: isValidSize }));
+    
+    if (!isValidSize) {
       setError("File size must be less than 200MB");
       return;
     }
@@ -316,6 +354,7 @@ export default function Upload() {
       console.log("[DEBUG] Starting thumbnail generation");
       const thumbnailUrl = await generateThumbnail(file);
       console.log("[DEBUG] Thumbnail generated successfully");
+      setValidationStatus(prev => ({ ...prev, thumbnail: true }));
 
       setPreview({ file, thumbnailUrl });
       
@@ -443,6 +482,11 @@ export default function Upload() {
       console.log("[DEBUG] Upload state set to false");
     } catch (err) {
       console.error("[DEBUG] Upload error:", err);
+      
+      // Update validation status for failure
+      if (err instanceof Error && err.message.includes('thumbnail')) {
+        setValidationStatus(prev => ({ ...prev, thumbnail: false }));
+      }
 
       const errorMsg = err instanceof Error ? err.message : "Failed to process video";
       
@@ -500,6 +544,7 @@ export default function Upload() {
       const frames = await extractFrames(videoFile);
       console.log(`[DEBUG] Extracted ${frames.length} frames from video`);
       setFrameProgress({ current: 0, total: frames.length });
+      setValidationStatus(prev => ({ ...prev, frameExtraction: frames.length > 0 }));
 
       // Upload frames to Supabase
       console.log("[DEBUG] Starting frame uploads");
@@ -557,20 +602,56 @@ export default function Upload() {
       );
 
       console.log("[DEBUG] Processing frames and generating descriptions");
-      // Process frames using the environment-appropriate AI service
-      await ai.processVideoFrames(recipeId, uploadedFrames);
+      
+      // Track frame processing results
+      let frameProcessingSuccess = false;
+      let processedFrameCount = 0;
+      
+      try {
+        // Process frames using the environment-appropriate AI service
+        await ai.processVideoFrames(recipeId, uploadedFrames);
+        frameProcessingSuccess = true;
+        processedFrameCount = uploadedFrames.length;
+        console.log(`[DEBUG] Successfully processed ${processedFrameCount} frames`);
+        setValidationStatus(prev => ({ ...prev, embeddings: true }));
+      } catch (frameError) {
+        console.error("[DEBUG] Error processing frames:", frameError);
+        setValidationStatus(prev => ({ ...prev, embeddings: false }));
+        // Continue with recipe summary even if some frames failed
+      }
 
       console.log(
         "[DEBUG] Frame processing complete, generating recipe summary"
       );
 
       // Generate recipe title and description based on processed frames
+      let summaryGenerated = false;
       try {
         await ai.updateRecipeWithSummary(recipeId);
+        summaryGenerated = true;
         console.log("[DEBUG] Recipe summary generated and updated");
       } catch (summaryError) {
         console.error("[DEBUG] Error generating recipe summary:", summaryError);
         // Continue even if summary generation fails
+      }
+      
+      // Update user about processing status
+      if (!frameProcessingSuccess && !summaryGenerated) {
+        toast.error("Failed to process frames and generate recipe summary. Check your API configuration.", {
+          duration: 6000,
+        });
+      } else if (!frameProcessingSuccess) {
+        toast.warning("Frame processing failed but recipe was created. Some features may be limited.", {
+          duration: 5000,
+        });
+      } else if (!summaryGenerated) {
+        toast.warning("Recipe created but summary generation failed. You can update the title later.", {
+          duration: 5000,
+        });
+      } else {
+        toast.success(`Successfully processed ${processedFrameCount} frames and generated recipe!`, {
+          duration: 4000,
+        });
       }
 
       // Extract and process social handles
@@ -983,6 +1064,13 @@ export default function Upload() {
           Upload a cooking video to share with the community
         </p>
       </div>
+
+      {/* Upload Validation Status */}
+      <UploadStatusTracker 
+        isVisible={showValidationStatus && !preview}
+        validationStatus={validationStatus}
+        errorMessage={error}
+      />
 
       {preview ? (
         <div className="space-y-6">
