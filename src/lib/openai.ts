@@ -15,7 +15,7 @@ const openai = new OpenAI({
 function isAllowedSupabaseUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    const supabaseProjectId = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    const supabaseProjectId = import.meta.env['VITE_SUPABASE_URL']?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
     
     if (!supabaseProjectId) return false;
     

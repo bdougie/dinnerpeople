@@ -18,7 +18,7 @@ interface OllamaResponse {
 function isAllowedOllamaUrl(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
-    const supabaseProjectId = import.meta.env.VITE_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+    const supabaseProjectId = import.meta.env['VITE_SUPABASE_URL']?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
     
     // Allow only URLs from our Supabase storage or local development
     const allowedHosts = [
