@@ -845,7 +845,7 @@ export default function Upload() {
                             <div className="mt-2 space-y-1">
                               <div className="flex justify-between text-sm text-white/80">
                                 <span>Optimizing for faster upload...</span>
-                                <span>{compression.progress}%</span>
+                                <span>{compression.progress || 0}%</span>
                               </div>
                               <div className="w-full bg-white/10 rounded-full h-2">
                                 <div
@@ -856,8 +856,15 @@ export default function Upload() {
                                 ></div>
                               </div>
                               {compression.originalSize > 0 && (
-                                <div className="text-xs text-white/60">
-                                  Original size: {formatBytes(compression.originalSize)}
+                                <div className="flex flex-col gap-1">
+                                  <div className="text-xs text-white/60">
+                                    Original size: {formatBytes(compression.originalSize)}
+                                  </div>
+                                  {compression.progress === 0 && (
+                                    <div className="text-xs text-white/60">
+                                      Estimated time: {Math.ceil(compression.originalSize / (1024 * 1024) / 10)} seconds
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>

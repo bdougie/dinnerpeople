@@ -10,6 +10,7 @@ import { useAuthStore } from "./store/authStore";
 import AdminSandbox from "./pages/admin/sandbox";
 import { UploadProvider } from "./contexts/UploadContext";
 import { UploadStatusIndicator } from "./components/UploadStatusIndicator";
+import { AdminRoute } from "./components/AdminRoute";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -47,7 +48,11 @@ function App() {
             <Route path="my-recipes" element={<MyRecipes />} />
             <Route path="upload" element={<Upload />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="admin/sandbox" element={<AdminSandbox />} />
+            <Route path="admin/sandbox" element={
+              <AdminRoute>
+                <AdminSandbox />
+              </AdminRoute>
+            } />
           </Route>
         </Routes>
         <UploadStatusIndicator />

@@ -12,6 +12,22 @@ const openai = new OpenAI({
 
 export async function analyzeFrame(imageUrl: string, customPrompt?: string): Promise<string> {
   try {
+    let finalImageUrl = imageUrl;
+    
+    // If the image URL is from localhost, fetch and convert to base64
+    if (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1')) {
+      try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const buffer = await blob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        finalImageUrl = `data:${blob.type};base64,${base64}`;
+      } catch (fetchError) {
+        console.error('Error fetching local image:', fetchError);
+        throw new Error('Failed to fetch local image for analysis');
+      }
+    }
+    
     const response = await openai.chat.completions.create({
       model: OPENAI_IMAGE_MODEL,
       messages: [
@@ -25,7 +41,7 @@ export async function analyzeFrame(imageUrl: string, customPrompt?: string): Pro
             {
               type: "image_url",
               image_url: {
-                url: imageUrl
+                url: finalImageUrl
               }
             }
           ]
