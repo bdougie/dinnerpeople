@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Upload from "./pages/Upload";
 import MyRecipes from "./pages/MyRecipes";
+import RecipeDetail from "./pages/RecipeDetail";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -53,6 +54,7 @@ function App() {
           >
             <Route index element={<Home />} />
             <Route path="my-recipes" element={<MyRecipes />} />
+            <Route path="my-recipes/:id" element={<RecipeDetail />} />
             <Route path="upload" element={<Upload />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/sandbox" element={
