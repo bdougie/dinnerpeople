@@ -6,6 +6,7 @@ import Upload from "./pages/Upload";
 import MyRecipes from "./pages/MyRecipes";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import { useAuthStore } from "./store/authStore";
 import AdminSandbox from "./pages/admin/sandbox";
 import TestDB from "./pages/admin/test-db";
@@ -37,6 +38,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route
             path="/"
             element={

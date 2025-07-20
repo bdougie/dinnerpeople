@@ -1,11 +1,30 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/auth';
+import { useAuthStore } from '../../store/authStore';
 
 export default function TestDB() {
   const { user } = useAuthStore();
   const [results, setResults] = useState<string>('');
   const [loading, setLoading] = useState(false);
+
+  const updatePasswordForAdmin = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: 'hejco1-Kumbyk-cemcus'
+      });
+      
+      if (error) {
+        setResults(`Error updating password: ${error.message}`);
+      } else {
+        setResults('Password updated successfully for ' + user?.email);
+      }
+    } catch (error) {
+      setResults(`Unexpected error: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const runTest = async () => {
     setLoading(true);
@@ -99,13 +118,23 @@ export default function TestDB() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-4">Database Test</h1>
       
-      <button
-        onClick={runTest}
-        disabled={loading}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 mb-4"
-      >
-        {loading ? 'Running Tests...' : 'Run Tests'}
-      </button>
+      <div className="flex gap-4 mb-4">
+        <button
+          onClick={runTest}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? 'Running Tests...' : 'Run Tests'}
+        </button>
+        
+        <button
+          onClick={updatePasswordForAdmin}
+          disabled={loading}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {loading ? 'Updating...' : 'Update Password'}
+        </button>
+      </div>
       
       <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded overflow-auto whitespace-pre-wrap">
         {results || 'Click "Run Tests" to start'}
