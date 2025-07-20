@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
+// TODO: Remove this entire test page after fixing admin authentication
+// See: https://github.com/bdougie/dinnerpeople/issues/27
 export default function TestDB() {
   const { user } = useAuthStore();
   const [results, setResults] = useState<string>('');

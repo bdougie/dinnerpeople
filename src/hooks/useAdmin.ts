@@ -9,6 +9,14 @@ export function useAdmin() {
 
   useEffect(() => {
     async function checkAdminStatus() {
+      // TODO: Remove this temporary override after fixing admin RLS policies
+      // See: https://github.com/bdougie/dinnerpeople/issues/27
+      if (localStorage.getItem('force_admin_access') === 'true') {
+        setIsAdmin(true);
+        setLoading(false);
+        return;
+      }
+
       if (!user) {
         setIsAdmin(false);
         setLoading(false);

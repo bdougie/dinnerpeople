@@ -282,15 +282,24 @@ export async function processSocialHandles(
     if (socialHandles && socialHandles.length > 0) {
       for (const handle of socialHandles) {
         const [platform, username] = handle.split(':');
-        const { error } = await supabase
-          .from('recipe_social_media')
-          .insert({
-            recipe_id: recipeId,
-            platform,
-            username,
-          });
+        try {
+          const { error } = await supabase
+            .from('recipe_social_media')
+            .insert({
+              recipe_id: recipeId,
+              platform,
+              username,
+            });
 
-        if (error) console.error('Error storing social handle:', error);
+          if (error) {
+            console.error('Error storing social handle:', error);
+            // Continue processing even if storage fails
+            // This might happen if the table doesn't exist yet
+          }
+        } catch (err) {
+          console.error('Failed to store social handle:', err);
+          // Continue processing other handles
+        }
       }
 
       // Format the first handle as a proper URL and update the recipe attribution

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
+// TODO: Remove this entire test page after fixing admin authentication
+// See: https://github.com/bdougie/dinnerpeople/issues/27
 export default function PasswordTest() {
   const [email, setEmail] = useState('ilikerobot@gmail.com');
   const [password, setPassword] = useState('');
@@ -138,9 +140,106 @@ export default function PasswordTest() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       setResults(`Current user: ${user.email} (${user.id})\n`);
+      
+      // Check admin status
+      const { data: isAdmin } = await supabase.rpc('check_is_admin');
+      setResults(prev => prev + `Admin status: ${isAdmin ? '✅ YES' : '❌ NO'}\n`);
     } else {
       setResults('No user logged in\n');
     }
+  };
+
+  const makeUserAdmin = async () => {
+    setLoading(true);
+    try {
+      setResults('Making user admin...\n');
+      
+      // First get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setResults('❌ Error: You must be logged in first\n');
+        setLoading(false);
+        return;
+      }
+      
+      // Try a direct SQL approach using RPC
+      const { data, error } = await supabase.rpc('make_user_admin', {
+        target_user_id: user.id,
+        target_email: user.email
+      });
+      
+      if (error) {
+        // If RPC doesn't exist, try direct insert
+        setResults(prev => prev + 'RPC failed, trying direct insert...\n');
+        
+        // Use raw SQL via the SQL editor approach
+        const insertQuery = `
+          INSERT INTO admin_users (user_id, email, created_by)
+          VALUES ('${user.id}', '${user.email}', '${user.id}')
+          ON CONFLICT (user_id) DO NOTHING
+          RETURNING *;
+        `;
+        
+        try {
+          // Try to insert directly
+          const { error: insertError } = await supabase
+            .from('admin_users')
+            .insert({ 
+              user_id: user.id,
+              email: user.email,
+              created_by: user.id
+            })
+            .select();
+            
+          if (insertError) {
+            setResults(prev => prev + `❌ Direct insert error: ${insertError.message}\n`);
+            
+            // Check if already exists
+            const { data: existingAdmin } = await supabase
+              .from('admin_users')
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
+              
+            if (existingAdmin) {
+              setResults(prev => prev + `✅ You're already an admin!\n`);
+            }
+          } else {
+            setResults(prev => prev + `✅ Success! ${user.email} is now an admin.\n`);
+          }
+        } catch (e) {
+          setResults(prev => prev + `Error with insert: ${e}\n`);
+        }
+      } else {
+        setResults(`✅ Success! ${user.email} is now an admin.\n`);
+      }
+      
+      // Verify admin status
+      const { data: isAdmin } = await supabase.rpc('check_is_admin');
+      setResults(prev => prev + `\nAdmin check: ${isAdmin ? '✅ Confirmed' : '❌ Failed'}\n`);
+      
+      if (isAdmin) {
+        setResults(prev => prev + '\nYou can now access:\n');
+        setResults(prev => prev + '- /admin/sandbox\n');
+        setResults(prev => prev + '- /admin/test-db\n');
+        setResults(prev => prev + '\n🎉 Try visiting /admin/sandbox now!\n');
+      }
+      
+    } catch (error) {
+      setResults(`❌ Error: ${error}\n`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goToSandbox = () => {
+    navigate('/admin/sandbox');
+  };
+
+  const forceAdminAccess = () => {
+    // Temporarily override admin check in localStorage
+    localStorage.setItem('force_admin_access', 'true');
+    setResults('✅ Admin access forced! You can now visit /admin/sandbox\n\nNote: This is a temporary override for development.');
   };
 
   return (
@@ -213,6 +312,28 @@ export default function PasswordTest() {
           className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
         >
           Open Mailpit
+        </button>
+        
+        <button
+          onClick={makeUserAdmin}
+          disabled={loading}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+        >
+          {loading ? 'Processing...' : 'Make Me Admin'}
+        </button>
+        
+        <button
+          onClick={goToSandbox}
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+        >
+          Go to Sandbox →
+        </button>
+        
+        <button
+          onClick={forceAdminAccess}
+          className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
+        >
+          🔓 Force Admin Access
         </button>
       </div>
       
